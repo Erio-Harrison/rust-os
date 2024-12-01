@@ -11,6 +11,17 @@ use rust_os::println;
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
     rust_os::init();
+
+    fn stack_overflow(){
+        stack_overflow();
+    }
+
+    stack_overflow();
+
+    unsafe {
+        *(0xdeadbeef as *mut u8) = 42;
+    }
+
     x86_64::instructions::interrupts::int3();
 
     #[cfg(test)]
