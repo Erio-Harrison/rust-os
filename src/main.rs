@@ -29,12 +29,12 @@ pub extern "C" fn _start() -> ! {
     #[cfg(test)]
     test_main();
 
-    loop {
-        use rust_os::print;
-        print!("-");        // new
-    }
+    // loop {
+    //     use rust_os::print;
+    //     print!("-"); 
+    // }
 
-    // println!("But nothing happened!");
+    println!("But nothing happened!");
     rust_os::hlt_loop();
 }
 
