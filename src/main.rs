@@ -26,16 +26,16 @@ pub extern "C" fn _start() -> ! {
 
     // x86_64::instructions::interrupts::int3();
 
+    #[cfg(test)]
+    test_main();
+    
     loop {
         use rust_os::print;
         print!("-");        // new
     }
 
-    #[cfg(test)]
-    test_main();
-
-    println!("But nothing happened!");
-    loop {}
+    // println!("But nothing happened!");
+    // loop {}
 }
 
 /// This function is called on panic.
