@@ -28,14 +28,14 @@ pub extern "C" fn _start() -> ! {
 
     #[cfg(test)]
     test_main();
-    
+
     loop {
         use rust_os::print;
         print!("-");        // new
     }
 
     // println!("But nothing happened!");
-    // loop {}
+    rust_os::hlt_loop();
 }
 
 /// This function is called on panic.
@@ -43,7 +43,7 @@ pub extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
+    rust_os::hlt_loop();
 }
 
 #[cfg(test)]
