@@ -11,7 +11,10 @@ use rust_os::println;
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
     rust_os::init();
+    use x86_64::registers::control::Cr3;
 
+    let (level_4_page_table, _) = Cr3::read();
+    println!("Level 4 page table at: {:?}", level_4_page_table.start_address());
     // println!("Timer interrupt test starting...");
     
     // loop {
@@ -25,6 +28,18 @@ pub extern "C" fn _start() -> ! {
     // }
 
     // x86_64::instructions::interrupts::int3();
+
+    // Note: The actual address might be different for you. Use the address that
+    // your page fault handler reports.
+    // let ptr = 0x2031b2 as *mut u8;
+
+    // // read from a code page
+    // unsafe { let x = *ptr; }
+    // println!("read worked");
+
+    // // write to a code page
+    // unsafe { *ptr = 42; }
+    // println!("write worked");
 
     #[cfg(test)]
     test_main();
