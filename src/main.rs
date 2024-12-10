@@ -10,6 +10,8 @@ use rust_os::{allocator, memory::BootInfoFrameAllocator, println};
 use bootloader::BootInfo;
 use x86_64::{structures::paging::{Page, PageTable}, VirtAddr};
 use alloc::{boxed::Box, vec, vec::Vec, rc::Rc};
+use rust_os::task::{Task, simple_executor::SimpleExecutor};
+
 
 #[no_mangle]
 pub extern "C" fn _start(boot_info : &'static BootInfo) -> ! {
@@ -113,6 +115,10 @@ pub extern "C" fn _start(boot_info : &'static BootInfo) -> ! {
     core::mem::drop(reference_counted);
     println!("reference count is {} now", Rc::strong_count(&cloned_reference));    
 
+    let mut executor = SimpleExecutor::new();
+    executor.spawn(Task::new(example_task()));
+    executor.run();
+
     #[cfg(test)]
     test_main();
 
@@ -123,6 +129,15 @@ pub extern "C" fn _start(boot_info : &'static BootInfo) -> ! {
 
     println!("But nothing happened!");
     rust_os::hlt_loop();
+}
+
+async fn async_number() -> u32 {
+    42
+}
+
+async fn example_task() {
+    let number = async_number().await;
+    println!("async number: {}", number);
 }
 
 /// This function is called on panic.
