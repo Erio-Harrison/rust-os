@@ -9,7 +9,7 @@ use core::panic::PanicInfo;
 use rust_os::{allocator, memory::BootInfoFrameAllocator, println};
 use bootloader::BootInfo;
 use x86_64::{structures::paging::{Page, PageTable}, VirtAddr};
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec, vec::Vec, rc::Rc};
 
 #[no_mangle]
 pub extern "C" fn _start(boot_info : &'static BootInfo) -> ! {
@@ -96,7 +96,22 @@ pub extern "C" fn _start(boot_info : &'static BootInfo) -> ! {
     allocator::init_heap(&mut mapper, &mut frame_allocator)
     .expect("heap initialization failed");
 
-    let _x = Box::new(1);
+    let heap_value = Box::new(1);
+    println!("heap_value at {:p}", heap_value);
+
+    // create a dynamically sized vector
+    let mut vec = Vec::new();
+    for i in 0..500 {
+        vec.push(i);
+    }
+    println!("vec at {:p}", vec.as_slice());
+
+    // create a reference counted vector -> will be freed when count reaches 0
+    let reference_counted = Rc::new(vec![1, 2, 3]);
+    let cloned_reference = reference_counted.clone();
+    println!("current reference count is {}", Rc::strong_count(&cloned_reference));
+    core::mem::drop(reference_counted);
+    println!("reference count is {} now", Rc::strong_count(&cloned_reference));    
 
     #[cfg(test)]
     test_main();
