@@ -5,7 +5,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use rust_os:: println;
+use rust_os::{memory::BootInfoFrameAllocator,  println};
 use bootloader::BootInfo;
 use x86_64::{structures::paging::{Page, PageTable}, VirtAddr};
 
@@ -59,7 +59,11 @@ pub extern "C" fn _start(boot_info : &'static BootInfo) -> ! {
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = memory::EmptyFramAllocator;
+    //let mut frame_allocator = memory::EmptyFramAllocator;
+
+    let mut frame_allocator = unsafe {
+        BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
 
     // map an unused page
     //let page = Page::containing_address(VirtAddr::new(0));
