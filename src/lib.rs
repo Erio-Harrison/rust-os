@@ -90,8 +90,8 @@ fn panic(info: &PanicInfo) -> ! {
 #[cfg(test)]
 use bootloader::{entry_point, BootInfo};
 
-#[cfg(test)]
-entry_point!(test_kernel_main);
+// #[cfg(test)]
+// entry_point!(test_kernel_main);
 
 /// Entry point for `cargo test`
 #[cfg(test)]
