@@ -1,5 +1,5 @@
 use x86_64::{
-    instructions, structures::paging::{FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB}, PhysAddr, VirtAddr
+    instructions, registers, structures::paging::{FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB}, PhysAddr, VirtAddr
 };
 
 use bootloader::bootinfo::MemoryMap;

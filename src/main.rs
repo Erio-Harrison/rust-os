@@ -4,10 +4,12 @@
 #![test_runner(rust_os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+extern crate alloc;
 use core::panic::PanicInfo;
-use rust_os::{memory::BootInfoFrameAllocator,  println};
+use rust_os::{allocator, memory::BootInfoFrameAllocator, println};
 use bootloader::BootInfo;
 use x86_64::{structures::paging::{Page, PageTable}, VirtAddr};
+use alloc::boxed::Box;
 
 #[no_mangle]
 pub extern "C" fn _start(boot_info : &'static BootInfo) -> ! {
@@ -91,6 +93,10 @@ pub extern "C" fn _start(boot_info : &'static BootInfo) -> ! {
     //     let phys = mapper.translate_addr(virt);
     //     println!("{:?} -> {:?}", virt, phys);
     // }
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+    .expect("heap initialization failed");
+
+    let _x = Box::new(1);
 
     #[cfg(test)]
     test_main();
