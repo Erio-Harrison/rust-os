@@ -1,6 +1,17 @@
 # Rust OS Kernel
 
-A minimal operating system kernel written in Rust, designed to run on QEMU. This educational project implements basic OS functionality including memory management, interrupt handling, keyboard input, and a simple task executor.
+A minimal operating system kernel written in Rust, designed to run on QEMU. This educational project implements basic OS functionality including memory management, interrupt handling, keyboard input, and a simple task executor. 
+
+I'm still working on it. My personal research project in the last semester is operating systems.
+
+References: 
+
+https://os.phil-opp.com/
+
+https://github.com/skyzh/core-os-riscv
+
+![example](assets/example.png)
+
 
 ## Features
 
