@@ -4,32 +4,13 @@ A minimal operating system kernel written in Rust, designed to run on QEMU. This
 
 I'm still working on it. My personal research project in the last semester is operating systems.
 
-References: 
+Reference: 
 
 https://os.phil-opp.com/
 
-https://github.com/skyzh/core-os-riscv
 
 ![example](assets/example.png)
 
-
-## Features
-
-- **Bare Metal x86_64**: Runs directly on x86_64 hardware with no underlying OS
-- **VGA Text Buffer**: Implements a VGA text mode driver for basic display output
-- **Interrupt Handling**: 
-  - CPU exceptions (breakpoint, page fault, double fault)
-  - Hardware interrupts (timer, keyboard)
-  - Custom interrupt descriptor table (IDT)
-- **Memory Management**:
-  - Paging support with a 4-level page table
-  - Physical and virtual memory mapping
-  - Heap allocation with a linked list allocator
-- **Global Descriptor Table (GDT)**: Custom GDT implementation with TSS support
-- **Serial Port Communication**: UART driver for debugging output
-- **Keyboard Support**: Basic keyboard input handling with US layout
-- **Async Task Execution**: Simple executor for async tasks
-- **Testing Framework**: Custom test runner with QEMU integration
 
 ## Prerequisites
 
