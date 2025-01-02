@@ -3,9 +3,6 @@ name = "rust-os"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-riscv = "0.10.1"
-
 [profile.dev]
 opt-level = 1
 debug = true
