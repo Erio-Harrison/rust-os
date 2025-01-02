@@ -1,11 +1,14 @@
+OUTPUT_ARCH(riscv)
 ENTRY(_start)
+BASE_ADDRESS = 0x80200000;
 
 SECTIONS
 {
-    . = 0xffffffff80000000;
+    . = BASE_ADDRESS;
+    skernel = .;
 
     .text : {
-        *(.text.init)
+        *(.text.entry)
         *(.text .text.*)
     }
 
@@ -18,8 +21,6 @@ SECTIONS
     }
 
     .bss : {
-        __bss_start = .;
         *(.bss .bss.*)
-        __bss_end = .;
     }
 }
