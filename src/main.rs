@@ -4,7 +4,7 @@
 #![test_runner(crate::test::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-pub mod println;
+pub mod console;
 pub mod sbi;
 pub mod test;
 pub mod uart;

@@ -1,4 +1,4 @@
-// src/console.rs
+// src/println.rs
 
 use core::fmt::{self, Write};
 //use crate::sbi::console_putchar;
@@ -20,7 +20,7 @@ impl Write for Stdout {
 macro_rules! print {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
-        let mut stdout = $crate::println::Stdout;
+        let mut stdout = $crate::console::Stdout;
         stdout.write_fmt(format_args!($($arg)*)).unwrap();
     });
 }
