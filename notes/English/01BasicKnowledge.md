@@ -1,49 +1,46 @@
-Basic Toolchain Installation:
+Basic Toolchain Installation
+
 ```bash
 rustup target add riscv64gc-unknown-none-elf
 rustup component add rust-src
 rustup component add llvm-tools-preview
 ```
 
-In x86 systems, we use firmware standards like BIOS or UEFI, while in RISC-V systems, we use the SBI standard. When targeting actual RISC-V hardware (like SiFive development boards), OpenSBI (a specific implementation of the SBI specification) typically needs to be flashed onto the hardware as firmware. However, since we're using QEMU to emulate the RISC-V environment, we don't need to install OpenSBI separately as it's already built into QEMU.
+In x86 systems, the firmware standards we use are BIOS or UEFI. In RISC-V systems, the standard we use is SBI. If our target platform is real RISC-V hardware (such as a SiFive development board), we typically need to flash OpenSBI (a specific implementation of the SBI specification) as firmware onto the hardware. However, since we are using QEMU to emulate a RISC-V environment, we do not need to install OpenSBI separately because QEMU already comes with OpenSBI built-in. You can see the content in `.cargo/config.toml`:
 
-You can see the contents of `.cargo/config.toml`:
 ```bash
-runner = ["qemu-system-riscv64", "-machine", "virt", "-nographic", "-bios", "default", "-kernel", "target/riscv64gc-unknown-none-elf/debug/rust-os"]
+runner = ["qemu-system-riscv64", "-machine", "virt", "-nographic", "-bios", "default", "-kernel"]
 ```
 
-Here, `-bios` doesn't refer to the BIOS standard but rather is a QEMU parameter for specifying the firmware standard. We use `default`, which means QEMU's default firmware (OpenSBI). For beginners, QEMU's default BIOS is sufficient for most scenarios. If you need to debug or customize OpenSBI, you can download or compile it and explicitly specify its path.
+Here, `-bios` does not mean the BIOS standard, but rather a parameter in QEMU to specify the firmware standard. We are using `default`, which means QEMU's default firmware is OpenSBI. For beginner development, QEMU's default BIOS is sufficient to support most scenarios. If you need to debug or customize OpenSBI, you can download or compile OpenSBI and explicitly specify its path.
 
 For example:
-```bash
-runner = ["qemu-system-riscv64", "-machine", "virt", "-nographic", "-bios", "path/to/opensbi.bin", "-kernel", "target/riscv64gc-unknown-none-elf/debug/rust-os"]
-```
-
-When a computer receives power, the CPU starts executing firmware code from a fixed memory address - this is the firmware loading process.
-
-The firmware then reads the bootloader (like GRUB or Windows Boot Manager) from the boot device (like hard drive or USB).
-
-The bootloader reads the operating system's `kernel.bin` file and loads it into memory. Then, the bootloader transfers control to the kernel, and the operating system starts running.
-
-The overall flow is like this:
-
-![HowToRunOS](../../assets/HowToRunOS.png)
-
-The `-kernel` parameter in `runner` specifies the kernel file to run (the compiled binary file, in our case `rust-os`). Interestingly, if we don't explicitly specify the kernel file:
 
 ```bash
 runner = ["qemu-system-riscv64", "-machine", "virt", "-nographic", "-bios", "path/to/opensbi.bin", "-kernel"]
 ```
 
-When running `cargo build` or `cargo run`, it still works because **cargo** automatically passes the generated binary file as the parameter for '-kernel' to QEMU.
+After the computer's power is turned on, the CPU starts executing firmware code from a fixed memory address, which is the process of loading the firmware. The firmware then reads the bootloader (such as GRUB or Windows Boot Manager) from the boot device (such as a hard drive or USB drive). The bootloader reads the operating system's `kernel.bin` file and loads it into memory. The bootloader then transfers control to the kernel, and the operating system starts running.
 
-The first two parameters are self-explanatory: `-machine virt` specifies that QEMU should use the `virt` virtual machine, which is a virtual RISC-V platform. `-nographic` disables graphical output and uses only the command-line interface. With `-nographic`, QEMU automatically redirects serial output to the command-line terminal. Since we haven't configured graphical output in our implementation, all output will be redirected to the command-line terminal.
+The entire process is roughly as follows:
 
-Now we can start development. Our operating system will ultimately generate a binary file (`rust-os`) that runs on QEMU. The transformation process from source code to binary file is shown in the following diagram:
+![HowToRunOS](../../assets/HowToRunOS.png)
+
+The `-kernel` parameter in `runner` specifies the kernel file to run (i.e., the compiled binary file, in this case, our kernel file is `rust-os`). Here, we do not need to explicitly specify the kernel file to run (`target/riscv64gc-unknown-none-elf/debug/rust-os`). When running `cargo build` or `cargo run`, it will still work correctly because **cargo** will automatically pass the generated binary file as the `-kernel` parameter to QEMU. This method of letting **cargo** handle it automatically can avoid some issues. For example, when running `cargo test`, **Cargo** generates independent executable files for each test target, and the path of these executable files is `target/riscv64gc-unknown-none-elf/debug/deps/rust_os-[hash]`, where the hash value is unique and may change with each compilation. Hardcoding the binary file path would cause `cargo test` to fail.
+
+The first two parameters are more self-explanatory. `-machine virt`: Specifies that QEMU should use the `virt` virtual machine, which is a virtual RISC-V platform. `-nographic`: Disables graphical output and only uses the command-line interface. Here, we use `-nographic`, and QEMU will automatically redirect serial output to the command-line terminal. In our implementation, we have not configured graphical output, so all related output will be redirected to the command-line terminal.
+
+Now we can start development. The operating system we write will eventually generate a binary file (`rust-os`), which will then run on QEMU. The process of converting source code to a binary file is shown in the following diagram:
 
 ![sourceTobin](../../assets/sourceTObin.png)
 
-At the beginning of our source code (`main.rs`), we embed assembly code through: `global_asm!(include_str!("arch/riscv/boot.S"));`:
+At the beginning of our source code (`main.rs`), we embed a piece of assembly code via:
+
+```rust
+global_asm!(include_str!("arch/riscv/boot.S"));
+```
+
+The assembly code is as follows:
 
 ```bash
     .section .text.entry
@@ -60,13 +57,13 @@ boot_stack:
 boot_stack_top:
 ```
 
-In the configuration file, we specify the linker script location:
+As you can see, in the configuration file, we specified the location of the linker script:
 
 ```bash
 rustflags = ["-C", "link-arg=-Tsrc/arch/riscv/linker.ld"]
 ```
 
-Its complete content is:
+Its full content is:
 
 ```bash
 OUTPUT_ARCH(riscv)
@@ -96,20 +93,20 @@ SECTIONS {
 }
 ```
 
-The complete workflow is as follows (corresponding to the above diagrams):
+The complete workflow is as follows (corresponding to the image above):
 
-1. Compilation Stage:
-   - `boot.S` is compiled into an object file (`boot.o`), containing `.text.entry` and `.bss.stack` sections.
-   - Rust code is compiled into object files (like `main.o`), containing `.text`, `.rodata`, `.data`, and `.bss` sections.
+1. **Compilation Phase**:
+   - `boot.S` is compiled into an object file (`boot.o`), which contains the `.text.entry` section and the `.bss.stack` section.
+   - Rust code is compiled into object files (e.g., `main.o`), which contain the `.text`, `.rodata`, `.data`, and `.bss` sections.
 
-2. Linking Stage:
-   - The linker combines object files into an executable file (like `kernel.bin`) according to `linker.ld`.
-   - The `.text.entry` section is placed at the beginning of the `.text` section, ensuring the `_start` symbol is at the start of the code section.
-   - The `.bss.stack` section is placed in the `.bss` section, with stack space properly allocated.
+2. **Linking Phase**:
+   - The linker merges the object files into an executable file (e.g., `kernel.bin`) according to `linker.ld`.
+   - The `.text.entry` section is placed at the beginning of the `.text` section, ensuring that the `_start` symbol is at the start of the code section.
+   - The `.bss.stack` section is placed in the `.bss` section, and the stack space is correctly allocated.
 
-3. Runtime Stage:
-   - QEMU loads the executable file into memory (starting at `0x80200000`).
-   - The bootloader jumps to the `_start` symbol, beginning the operating system's startup code.
-   - The code in `boot.S` sets up the stack pointer and jumps to the Rust code, starting the operating system's main logic.
+3. **Execution Phase**:
+   - QEMU loads the executable file into memory (starting from `0x80200000`).
+   - The bootloader jumps to the `_start` symbol, and the operating system's startup code begins execution.
+   - The code in `boot.S` sets the stack pointer and jumps to the Rust code, and the main logic of the operating system starts running.
 
-With this, we've established the basic framework of our operating system. In the next section, we'll implement the basic `print` functionality.
+At this point, the general framework of our operating system is established. In the next section, we will implement the basic `print` functionality.
