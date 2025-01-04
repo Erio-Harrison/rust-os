@@ -1,4 +1,4 @@
-.section .text.entry
+    .section .text.entry
     .globl _start
 _start:
     # 设置栈指针
