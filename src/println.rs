@@ -1,14 +1,16 @@
 // src/console.rs
 
 use core::fmt::{self, Write};
-use crate::sbi::console_putchar;
+//use crate::sbi::console_putchar;
+use crate::uart::putchar;
 
 pub struct Stdout;
 
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.chars() {
-            console_putchar(c as usize);
+            //console_putchar(c as usize);
+            putchar(c as u8);
         }
         Ok(())
     }
@@ -18,7 +20,7 @@ impl Write for Stdout {
 macro_rules! print {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
-        let mut stdout = $crate::console::Stdout;
+        let mut stdout = $crate::println::Stdout;
         stdout.write_fmt(format_args!($($arg)*)).unwrap();
     });
 }

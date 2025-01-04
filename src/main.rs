@@ -4,9 +4,10 @@
 #![test_runner(crate::test::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-pub mod console;
+pub mod println;
 pub mod sbi;
 pub mod test;
+pub mod uart;
 
 use core::panic::PanicInfo;
 use core::arch::global_asm;
