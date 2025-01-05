@@ -29,7 +29,6 @@ pub fn test_panic_handler(info: &core::panic::PanicInfo) -> ! {
     println!("\x1b[0;31m[failed]\x1b[0m");
     println!("Error: {}\n", info);
     exit_qemu(QemuExitCode::Failed);
-    //loop {}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,4 +41,26 @@ pub enum QemuExitCode {
 pub fn exit_qemu(exit_code: QemuExitCode) -> ! {
     let _ = exit_code;
     crate::sbi::shutdown()
+}
+
+#[test_case]
+fn test_println() {
+    println!("test_println output");
+}
+
+#[test_case]
+fn test_assertion() {
+    assert_eq!(1 + 1, 2);
+}
+
+#[test_case]
+fn test_println_simple() {
+    println!("test_println_simple output");
+}
+
+#[test_case]
+fn test_println_many() {
+    for i in 0..5 {
+        println!("test line {}", i);
+    }
 }

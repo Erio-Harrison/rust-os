@@ -6,6 +6,7 @@
 
 pub mod console;
 pub mod sbi;
+pub mod test_device;
 pub mod test;
 pub mod uart;
 
@@ -36,27 +37,4 @@ fn panic(info: &PanicInfo) -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     test::test_panic_handler(info)
-}
-
-// 测试用例
-#[test_case]
-fn test_println() {
-    println!("test_println output");
-}
-
-#[test_case]
-fn test_assertion() {
-    assert_eq!(1 + 1, 2);
-}
-
-#[test_case]
-fn test_println_simple() {
-    println!("test_println_simple output");
-}
-
-#[test_case]
-fn test_println_many() {
-    for i in 0..5 {
-        println!("test line {}", i);
-    }
 }
