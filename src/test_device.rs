@@ -21,7 +21,7 @@ pub fn exit_pass() -> ! {
         // Print confirmation message
         println!("Exiting QEMU with success status...");
         // Write exit code
-        write_reg(0, TEST_EXIT_PASS);
+        write_reg_to_exit(0, TEST_EXIT_PASS);
         // Theoretically, this point should never be reached as QEMU should have exited
         loop {}
     }
@@ -33,13 +33,13 @@ pub fn exit_fail() -> ! {
         // Print confirmation message
         println!("Exiting QEMU with failure status...");
         // Write exit code
-        write_reg(0, TEST_EXIT_FAIL);
+        write_reg_to_exit(0, TEST_EXIT_FAIL);
         // Theoretically, this point should never be reached as QEMU should have exited
         loop {}
     }
 }
 
 // Write to a device register
-unsafe fn write_reg(offset: usize, val: u32) {
+unsafe fn write_reg_to_exit(offset: usize, val: u32) {
     write_volatile((SIFIVE_TEST_BASE + offset) as *mut u32, val)
 }
