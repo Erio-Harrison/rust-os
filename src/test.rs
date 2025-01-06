@@ -40,7 +40,12 @@ pub enum QemuExitCode {
 
 pub fn exit_qemu(exit_code: QemuExitCode) -> ! {
     let _ = exit_code;
-    crate::sbi::shutdown()
+    //crate::sbi::shutdown()
+    //crate::test_device::exit_pass()
+    match exit_code {
+        QemuExitCode::Success => crate::test_device::exit_pass(),
+        QemuExitCode::Failed => crate::test_device::exit_fail(),
+    }
 }
 
 #[test_case]
