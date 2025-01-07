@@ -9,20 +9,30 @@ pub mod sbi;
 pub mod test_device;
 pub mod test;
 pub mod uart;
+pub mod trap;
 
 use core::panic::PanicInfo;
 use core::arch::global_asm;
 
 global_asm!(include_str!("arch/riscv/boot.S"));
+global_asm!(include_str!("arch/riscv/trap.S"));
+
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
     println!("Hello RISCV!");
-    
-    #[cfg(test)]
-    test_main();
-    
-    println!("It did not crash!");
+    trap::init();
+
+    println!("Testing breakpoint...");
+    // 使用内联汇编直接插入 ebreak 指令
+    unsafe {
+        core::arch::asm!(
+            "ebreak",
+            options(nomem, nostack)
+        );
+    }
+
+    println!("Successfully handled breakpoint!");
     loop {}
 }
 
