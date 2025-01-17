@@ -1,18 +1,27 @@
 Let's implement basic printing functionality. Before we formally begin, we need to introduce RISC-V privilege levels.
 
-RISC-V defines three main privilege levels (X86 has four privilege levels):
+RISC-V defines four main privilege levels:
 
-1. Machine Mode (M Mode):
-- Highest privilege level, direct hardware access
-- Typically used by firmware (like OpenSBI) or the lowest layer of the operating system kernel
+1. Machine Mode (M-mode):
 
-2. Supervisor Mode (S Mode):
-- Used for operating system kernels
-- Can access some hardware resources but needs to go through M mode interface (like SBI) to access lower-level hardware
+The highest privilege level with direct access to hardware.
+Typically used by firmware (e.g., OpenSBI) or the lowest level of the operating system kernel.
 
-3. User Mode (U Mode):
-- Used for applications
-- Cannot directly access hardware, must use system calls (S mode) or SBI (M mode) to access hardware
+2. Supervisor Mode (S-mode):
+
+Used by the operating system kernel.
+Can access some hardware resources but needs to go through M-mode interfaces (e.g., SBI) to access lower-level hardware.
+
+3. User Mode (U-mode):
+
+Used by applications.
+Cannot directly access hardware and must go through system calls (S-mode) or SBI (M-mode) to access hardware.
+
+4. Hypervisor Mode (H-mode):
+
+Positioned between S-mode and M-mode, with privileges higher than S-mode but lower than M-mode, capable of directly managing virtual CPUs, memory, and other resources.
+
+Our main focus is on the first three.
 
 We used two methods for implementing printing: `UART` and `SBI`. The `SBI` is currently commented out:
 
