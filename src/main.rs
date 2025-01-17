@@ -10,6 +10,11 @@ pub mod test_device;
 pub mod test;
 pub mod uart;
 pub mod trap;
+pub mod spinlock;
+pub mod proc;
+pub mod param;
+pub mod types;
+pub mod file;
 
 use core::panic::PanicInfo;
 use core::arch::global_asm;
