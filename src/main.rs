@@ -16,6 +16,8 @@ pub mod proc;
 pub mod param;
 pub mod types;
 pub mod file;
+pub mod pipe;
+pub mod sleeplock;
 
 use core::panic::PanicInfo;
 use core::arch::global_asm;
