@@ -10,6 +10,7 @@ pub mod test_device;
 pub mod test;
 pub mod uart;
 pub mod trap;
+pub mod riscv;
 pub mod spinlock;
 pub mod proc;
 pub mod param;
