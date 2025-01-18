@@ -315,8 +315,8 @@ pub type PTE = u64;
 pub type PageTable = *mut u64; // 512 PTEs
 
 // Page size constants
-pub const PGSIZE: usize = 4096;         // bytes per page
-pub const PGSHIFT: usize = 12;          // bits of offset within a page
+pub const PGSIZE: u64 = 4096;         // bytes per page
+pub const PGSHIFT: u64 = 12;          // bits of offset within a page
 
 // Page table entry flags
 pub const PTE_V: u64 = 1 << 0;         // valid
@@ -359,15 +359,4 @@ pub fn pte2pa(pte: u64) -> u64 {
 #[inline]
 pub fn pte_flags(pte: u64) -> u64 {
     pte & 0x3FF
-}
-
-// extract the three 9-bit page table indices from a virtual address.
-#[inline]
-pub fn pxshift(level: usize) -> usize {
-    PGSHIFT + (9 * level)
-}
-
-#[inline]
-pub fn px(level: usize, va: u64) -> u64 {
-    (va >> pxshift(level)) & PXMASK
 }

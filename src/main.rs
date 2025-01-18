@@ -17,6 +17,9 @@ pub mod param;
 pub mod types;
 pub mod file;
 pub mod pipe;
+pub mod kalloc;
+pub mod fs;
+pub mod memlayout;
 pub mod sleeplock;
 
 use core::panic::PanicInfo;

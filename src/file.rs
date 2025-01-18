@@ -1,6 +1,6 @@
+use crate::fs::NDIRECT;
 use crate::pipe::Pipe;
 use crate::sleeplock::Sleeplock;
-use super::param::*;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum FileType {

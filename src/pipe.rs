@@ -1,7 +1,5 @@
-use crate::param::PIPESIZE;
-
 use super::spinlock::SpinLock;
-
+pub const PIPESIZE: usize = 512;
 #[repr(C)]
 pub struct Pipe {
     pub lock: SpinLock,
