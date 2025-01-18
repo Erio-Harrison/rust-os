@@ -1,7 +1,7 @@
 use core::ptr;
 
 use crate::memlayout::KSTACK;
-use crate::riscv::PGSIZE;
+use crate::riscv::{PGSIZE, PTE_R, PTE_W};
 use crate::{param::*, riscv};
 use super::spinlock::SpinLock;
 use super::file::File;
@@ -164,18 +164,18 @@ extern "C" {
     static trampoline: [u8; 0]; // trampoline.S
 }
 
-// /// Allocate a page for each process's kernel stack.
-// /// Map it high in memory, followed by an invalid guard page.
-// pub unsafe fn proc_mapstacks(kpgtbl: *mut u64) {
-//     for i in 0..NPROC {
-//         let pa = super::kalloc::kalloc();
-//         if pa.is_null() {
-//             panic!("kalloc");
-//         }
-//         let va = KSTACK(i);
-//         super::vm::kvmmap(kpgtbl, va, pa as u64, PGSIZE as u64, PTE_R | PTE_W);
-//     }
-// }
+/// Allocate a page for each process's kernel stack.
+/// Map it high in memory, followed by an invalid guard page.
+pub unsafe fn proc_mapstacks(kpgtbl: *mut usize) {
+    for i in 0..NPROC {
+        let pa = super::kalloc::kalloc();
+        if pa.is_null() {
+            panic!("kalloc");
+        }
+        let va = KSTACK(i);
+        super::vm::kvmmap(kpgtbl, va, pa as u64, PGSIZE as u64, (PTE_R | PTE_W).try_into().unwrap());
+    }
+}
 
 /// Initialize the proc table.
 pub unsafe fn procinit() {

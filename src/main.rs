@@ -19,6 +19,8 @@ pub mod file;
 pub mod pipe;
 pub mod kalloc;
 pub mod fs;
+pub mod vm;
+pub mod elf;
 pub mod memlayout;
 pub mod sleeplock;
 
