@@ -1,12 +1,13 @@
-use crate::types::uint;
 use crate::riscv;
+use crate::types::uint;
 
 /// Mutual exclusion spin lock
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct SpinLock {
-    pub locked: uint,          // Is the lock held?
-    pub name: *const u8,       // Name of lock, for debugging
-    pub cpu: *mut super::proc::Cpu,  // The CPU holding the lock
+    pub locked: uint,               // Is the lock held?
+    pub name: *const u8,            // Name of lock, for debugging
+    pub cpu: *mut super::proc::Cpu, // The CPU holding the lock
 }
 
 impl SpinLock {
@@ -29,7 +30,7 @@ impl SpinLock {
 
     /// Acquire the lock
     /// Loops (spins) until the lock is acquired.
-    /// 
+    ///
     /// # Safety
     /// - Must ensure no reentrant locking (same CPU acquiring lock twice)
     /// - Automatically disables interrupts to avoid deadlock
@@ -45,13 +46,13 @@ impl SpinLock {
         // On RISC-V, this compiles to an atomic swap instruction:
         //   amoswap.w.aq a5, a5, (s1)
         while core::sync::atomic::AtomicUsize::new(1)
-        .compare_exchange(
-            0,
-            1,
-            core::sync::atomic::Ordering::Acquire,
-            core::sync::atomic::Ordering::Relaxed,
-        )
-        .is_err()
+            .compare_exchange(
+                0,
+                1,
+                core::sync::atomic::Ordering::Acquire,
+                core::sync::atomic::Ordering::Relaxed,
+            )
+            .is_err()
         {
             // Hint to the processor that we're spinning
             core::hint::spin_loop();
@@ -67,7 +68,7 @@ impl SpinLock {
     }
 
     /// Release the lock
-    /// 
+    ///
     /// # Safety
     /// - Must only be called by the CPU holding the lock
     /// - Must ensure all critical section operations are complete
@@ -93,7 +94,7 @@ impl SpinLock {
     }
 
     /// Check whether this cpu is holding the lock
-    /// 
+    ///
     /// # Safety
     /// - Interrupts must be off when calling this function
     #[inline]
@@ -108,7 +109,7 @@ impl SpinLock {
 pub unsafe fn push_off() {
     let old = riscv::intr_get();
     riscv::intr_off();
-    
+
     let cpu = super::proc::mycpu();
     if (*cpu).noff == 0 {
         (*cpu).intena = old;
@@ -118,21 +119,21 @@ pub unsafe fn push_off() {
 
 /// Decrement noff count and restore interrupts if count reaches 0
 /// and interrupts were enabled before
-/// 
+///
 /// # Panics
 /// - If interrupts are currently enabled
 /// - If noff is less than 1
 #[inline]
 pub unsafe fn pop_off() {
     let cpu = super::proc::mycpu();
-    
+
     if riscv::intr_get() {
         panic!("pop_off - interruptible");
     }
     if (*cpu).noff < 1 {
         panic!("pop_off");
     }
-    
+
     (*cpu).noff -= 1;
     if (*cpu).noff == 0 && (*cpu).intena {
         riscv::intr_on();

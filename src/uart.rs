@@ -19,7 +19,7 @@ const LCR: usize = 0x3; // Line Control Register
 const LSR: usize = 0x5; // Line Status Register
 
 // Line Status Register bits
-const LSR_DR: u8 = 1 << 0;   // Data Ready
+const LSR_DR: u8 = 1 << 0; // Data Ready
 const LSR_THRE: u8 = 1 << 5; // Transmitter Holding Register Empty
 
 /// Initialize the UART

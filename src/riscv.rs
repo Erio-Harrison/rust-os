@@ -1,11 +1,11 @@
 use crate::types::uint64;
 
 // Machine Status Register (mstatus) related constants
-pub const MSTATUS_MPP_MASK: uint64 = 3 << 11;  // previous mode
-pub const MSTATUS_MPP_M: uint64 = 3 << 11;     // machine mode
-pub const MSTATUS_MPP_S: uint64 = 1 << 11;     // supervisor mode
-pub const MSTATUS_MPP_U: uint64 = 0 << 11;     // user mode
-pub const MSTATUS_MIE: uint64 = 1 << 3;        // machine-mode interrupt enable
+pub const MSTATUS_MPP_MASK: uint64 = 3 << 11; // previous mode
+pub const MSTATUS_MPP_M: uint64 = 3 << 11; // machine mode
+pub const MSTATUS_MPP_S: uint64 = 1 << 11; // supervisor mode
+pub const MSTATUS_MPP_U: uint64 = 0 << 11; // user mode
+pub const MSTATUS_MIE: uint64 = 1 << 3; // machine-mode interrupt enable
 
 /// Returns the hardware thread (hart) ID
 #[inline]
@@ -37,11 +37,11 @@ pub unsafe fn w_mepc(x: uint64) {
 }
 
 // Supervisor Status Register, sstatus
-pub const SSTATUS_SPP: u64 = 1 << 8;   // Previous mode, 1=Supervisor, 0=User
-pub const SSTATUS_SPIE: u64 = 1 << 5;  // Supervisor Previous Interrupt Enable
-pub const SSTATUS_UPIE: u64 = 1 << 4;  // User Previous Interrupt Enable
-pub const SSTATUS_SIE: u64 = 1 << 1;   // Supervisor Interrupt Enable
-pub const SSTATUS_UIE: u64 = 1 << 0;   // User Interrupt Enable
+pub const SSTATUS_SPP: u64 = 1 << 8; // Previous mode, 1=Supervisor, 0=User
+pub const SSTATUS_SPIE: u64 = 1 << 5; // Supervisor Previous Interrupt Enable
+pub const SSTATUS_UPIE: u64 = 1 << 4; // User Previous Interrupt Enable
+pub const SSTATUS_SIE: u64 = 1 << 1; // Supervisor Interrupt Enable
+pub const SSTATUS_UIE: u64 = 1 << 0; // User Interrupt Enable
 
 #[inline]
 pub unsafe fn r_sstatus() -> u64 {
@@ -69,9 +69,9 @@ pub unsafe fn w_sip(x: u64) {
 }
 
 // Supervisor Interrupt Enable
-pub const SIE_SEIE: u64 = 1 << 9;  // external
-pub const SIE_STIE: u64 = 1 << 5;  // timer
-pub const SIE_SSIE: u64 = 1 << 1;  // software
+pub const SIE_SEIE: u64 = 1 << 9; // external
+pub const SIE_STIE: u64 = 1 << 5; // timer
+pub const SIE_SSIE: u64 = 1 << 1; // software
 
 #[inline]
 pub unsafe fn r_sie() -> u64 {
@@ -86,7 +86,7 @@ pub unsafe fn w_sie(x: u64) {
 }
 
 // Machine-mode Interrupt Enable
-pub const MIE_STIE: u64 = 1 << 5;  // supervisor timer
+pub const MIE_STIE: u64 = 1 << 5; // supervisor timer
 
 #[inline]
 pub unsafe fn r_mie() -> u64 {
@@ -315,18 +315,18 @@ pub type PTE = u64;
 pub type PageTable = *mut u64; // 512 PTEs
 
 // Page size constants
-pub const PGSIZE: u64 = 4096;         // bytes per page
-pub const PGSHIFT: u64 = 12;          // bits of offset within a page
+pub const PGSIZE: u64 = 4096; // bytes per page
+pub const PGSHIFT: u64 = 12; // bits of offset within a page
 
 // Page table entry flags
-pub const PTE_V: u64 = 1 << 0;         // valid
-pub const PTE_R: u64 = 1 << 1;         // readable
-pub const PTE_W: u64 = 1 << 2;         // writable
-pub const PTE_X: u64 = 1 << 3;         // executable
-pub const PTE_U: u64 = 1 << 4;         // user can access
+pub const PTE_V: u64 = 1 << 0; // valid
+pub const PTE_R: u64 = 1 << 1; // readable
+pub const PTE_W: u64 = 1 << 2; // writable
+pub const PTE_X: u64 = 1 << 3; // executable
+pub const PTE_U: u64 = 1 << 4; // user can access
 
 // Page table index extraction constants
-pub const PXMASK: u64 = 0x1FF;         // 9 bits
+pub const PXMASK: u64 = 0x1FF; // 9 bits
 
 // Maximum virtual address
 // MAXVA is actually one bit less than the max allowed by

@@ -1,7 +1,13 @@
-use core::ptr;
 use crate::{
-    kalloc::{kalloc, kfree}, memlayout::{KERNBASE, PHYSTOP, PLIC, TRAMPOLINE, UART0, VIRTIO0}, proc::proc_mapstacks, riscv::{make_satp, pa2pte, pgrounddown, pgroundup, pte2pa, pte_flags, sfence_vma, w_satp, MAXVA, PGSIZE, PTE_R, PTE_U, PTE_V, PTE_W, PTE_X}
+    kalloc::{kalloc, kfree},
+    memlayout::{KERNBASE, PHYSTOP, PLIC, TRAMPOLINE, UART0, VIRTIO0},
+    proc::proc_mapstacks,
+    riscv::{
+        make_satp, pa2pte, pgrounddown, pgroundup, pte2pa, pte_flags, sfence_vma, w_satp, MAXVA,
+        PGSIZE, PTE_R, PTE_U, PTE_V, PTE_W, PTE_X,
+    },
 };
+use core::ptr;
 
 pub type PageTable = *mut usize;
 pub type PTE = u64;
@@ -33,7 +39,9 @@ unsafe fn kvmmake() -> PageTable {
         kpgtbl,
         KERNBASE,
         KERNBASE,
-        (&etext as *const _ as usize - KERNBASE as usize).try_into().unwrap(),
+        (&etext as *const _ as usize - KERNBASE as usize)
+            .try_into()
+            .unwrap(),
         (PTE_R | PTE_X).try_into().unwrap(),
     );
 
@@ -101,11 +109,11 @@ unsafe fn walk(pagetable: PageTable, va: u64, alloc: bool) -> *mut PTE {
     let px = |level| ((va >> (12 + 9 * level)) & PXMASK) as usize;
 
     let mut pagetable = pagetable as *mut PTE;
-    
+
     // for each level of the page table
     for level in (1..=2).rev() {
         let pte = &mut *pagetable.add(px(level));
-        
+
         if *pte & PTE_V as u64 != 0 {
             pagetable = (((*pte) >> 10) << 12) as *mut PTE;
         } else {
@@ -251,7 +259,13 @@ pub unsafe fn uvmfirst(pagetable: PageTable, src: *const u8, sz: usize) {
     }
 
     ptr::write_bytes(mem, 0, PGSIZE.try_into().unwrap());
-    mappages(pagetable, 0, PGSIZE as u64, mem as u64, PTE_W | PTE_R | PTE_X | PTE_U);
+    mappages(
+        pagetable,
+        0,
+        PGSIZE as u64,
+        mem as u64,
+        PTE_W | PTE_R | PTE_X | PTE_U,
+    );
     ptr::copy_nonoverlapping(src, mem, sz);
 }
 
@@ -272,8 +286,15 @@ pub unsafe fn uvmalloc(pagetable: PageTable, oldsz: u64, newsz: u64, xperm: i32)
             return 0;
         }
         ptr::write_bytes(mem, 0, PGSIZE.try_into().unwrap());
-        
-        if mappages(pagetable, a, PGSIZE as u64, mem as u64, PTE_R | PTE_U | xperm as u64) != 0 {
+
+        if mappages(
+            pagetable,
+            a,
+            PGSIZE as u64,
+            mem as u64,
+            PTE_R | PTE_U | xperm as u64,
+        ) != 0
+        {
             kfree(mem);
             uvmdealloc(pagetable, a, oldsz);
             return 0;
@@ -343,24 +364,24 @@ pub unsafe fn uvmcopy(old: PageTable, new: PageTable, sz: u64) -> i32 {
         if (*pte & PTE_V) == 0 {
             panic!("uvmcopy: page not present");
         }
-        
+
         let pa = pte2pa(*pte);
         let flags = pte_flags(*pte);
         let mem = kalloc();
-        
+
         if mem.is_null() {
             uvmunmap(new, 0, i / PGSIZE as u64, true);
             return -1;
         }
 
         ptr::copy_nonoverlapping(pa as *const u8, mem, PGSIZE.try_into().unwrap());
-        
+
         if mappages(new, i, PGSIZE as u64, mem as u64, flags) != 0 {
             kfree(mem);
             uvmunmap(new, 0, i / PGSIZE as u64, true);
             return -1;
         }
-        
+
         i += PGSIZE as u64;
     }
     0
@@ -383,7 +404,7 @@ pub unsafe fn copyout(
     pagetable: PageTable,
     mut dstva: u64,
     mut src: *const u8,
-    mut len: u64
+    mut len: u64,
 ) -> i32 {
     while len > 0 {
         let va0 = pgrounddown(dstva);
@@ -392,11 +413,7 @@ pub unsafe fn copyout(
         }
 
         let pte = walk(pagetable, va0, false);
-        if pte.is_null()
-            || (*pte & PTE_V) == 0
-            || (*pte & PTE_U) == 0
-            || (*pte & PTE_W) == 0
-        {
+        if pte.is_null() || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 || (*pte & PTE_W) == 0 {
             return -1;
         }
 
@@ -406,11 +423,7 @@ pub unsafe fn copyout(
             n = len;
         }
 
-        ptr::copy_nonoverlapping(
-            src,
-            (pa0 + (dstva - va0)) as *mut u8,
-            n as usize
-        );
+        ptr::copy_nonoverlapping(src, (pa0 + (dstva - va0)) as *mut u8, n as usize);
 
         len -= n;
         src = src.add(n as usize);
@@ -422,12 +435,7 @@ pub unsafe fn copyout(
 /// Copy from user to kernel.
 /// Copy len bytes to dst from virtual address srcva in a given page table.
 /// Return 0 on success, -1 on error.
-pub unsafe fn copyin(
-    pagetable: PageTable,
-    mut dst: *mut u8,
-    mut srcva: u64,
-    mut len: u64
-) -> i32 {
+pub unsafe fn copyin(pagetable: PageTable, mut dst: *mut u8, mut srcva: u64, mut len: u64) -> i32 {
     while len > 0 {
         let va0 = pgrounddown(srcva);
         let pa0 = walkaddr(pagetable, va0);
@@ -440,11 +448,7 @@ pub unsafe fn copyin(
             n = len;
         }
 
-        ptr::copy_nonoverlapping(
-            (pa0 + (srcva - va0)) as *const u8,
-            dst,
-            n as usize
-        );
+        ptr::copy_nonoverlapping((pa0 + (srcva - va0)) as *const u8, dst, n as usize);
 
         len -= n;
         dst = dst.add(n as usize);
@@ -461,7 +465,7 @@ pub unsafe fn copyinstr(
     pagetable: PageTable,
     mut dst: *mut u8,
     mut srcva: u64,
-    mut max: u64
+    mut max: u64,
 ) -> i32 {
     let mut got_null = false;
 

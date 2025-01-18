@@ -4,32 +4,37 @@
 #![test_runner(crate::test::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+pub mod bio;
 pub mod console;
-pub mod sbi;
-pub mod test_device;
-pub mod test;
-pub mod uart;
-pub mod trap;
-pub mod riscv;
-pub mod spinlock;
-pub mod proc;
-pub mod param;
-pub mod types;
-pub mod file;
-pub mod pipe;
-pub mod kalloc;
-pub mod fs;
-pub mod vm;
 pub mod elf;
+pub mod file;
+pub mod fs;
+pub mod kalloc;
+pub mod log;
 pub mod memlayout;
+pub mod param;
+pub mod pipe;
+pub mod proc;
+pub mod riscv;
+pub mod sbi;
 pub mod sleeplock;
+pub mod spinlock;
+pub mod start;
+pub mod stat;
+pub mod string;
+pub mod test;
+pub mod test_device;
+pub mod trap;
+pub mod types;
+pub mod uart;
+pub mod virtio;
+pub mod vm;
 
-use core::panic::PanicInfo;
 use core::arch::global_asm;
+use core::panic::PanicInfo;
 
 global_asm!(include_str!("arch/riscv/boot.S"));
 global_asm!(include_str!("arch/riscv/trap.S"));
-
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
@@ -39,10 +44,7 @@ pub extern "C" fn rust_main() -> ! {
     println!("Testing breakpoint...");
     // 使用内联汇编直接插入 ebreak 指令
     unsafe {
-        core::arch::asm!(
-            "ebreak",
-            options(nomem, nostack)
-        );
+        core::arch::asm!("ebreak", options(nomem, nostack));
     }
 
     println!("Successfully handled breakpoint!");
