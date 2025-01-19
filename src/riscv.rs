@@ -16,7 +16,8 @@ pub unsafe fn r_mhartid() -> uint64 {
 }
 
 /// Read machine status register (mstatus)
-#[inline]
+#[inline(never)]
+#[no_mangle]
 pub unsafe fn r_mstatus() -> uint64 {
     let x: uint64;
     core::arch::asm!("csrr {}, mstatus", out(reg) x);

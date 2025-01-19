@@ -1,4 +1,5 @@
-use crate::riscv;
+use crate::println;
+use crate::riscv::{self, intr_get, intr_off, intr_on};
 use crate::types::uint;
 
 /// Mutual exclusion spin lock
@@ -107,9 +108,8 @@ impl SpinLock {
 /// This is a nested operation that requires matching pop_off calls
 #[inline]
 pub unsafe fn push_off() {
-    let old = riscv::intr_get();
-    riscv::intr_off();
-
+    let old = intr_get();
+    intr_off();
     let cpu = super::proc::mycpu();
     if (*cpu).noff == 0 {
         (*cpu).intena = old;
@@ -126,16 +126,8 @@ pub unsafe fn push_off() {
 #[inline]
 pub unsafe fn pop_off() {
     let cpu = super::proc::mycpu();
-
-    if riscv::intr_get() {
-        panic!("pop_off - interruptible");
-    }
-    if (*cpu).noff < 1 {
-        panic!("pop_off");
-    }
-
     (*cpu).noff -= 1;
     if (*cpu).noff == 0 && (*cpu).intena {
-        riscv::intr_on();
+        intr_on();
     }
 }

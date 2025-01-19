@@ -16,7 +16,6 @@ pub mod param;
 pub mod pipe;
 pub mod proc;
 pub mod riscv;
-pub mod sbi;
 pub mod sleeplock;
 pub mod spinlock;
 pub mod start;
@@ -29,27 +28,65 @@ pub mod types;
 pub mod uart;
 pub mod virtio;
 pub mod vm;
+pub mod plic;
+pub mod syscall;
 
 use core::arch::global_asm;
 use core::panic::PanicInfo;
+use proc::scheduler;
+
+use core::sync::atomic::{AtomicBool, Ordering};
+
+static STARTED: AtomicBool = AtomicBool::new(false);
+
+
+
+global_asm!(include_str!("arch/riscv/macro.S"));
 
 global_asm!(include_str!("arch/riscv/boot.S"));
-global_asm!(include_str!("arch/riscv/trap.S"));
+global_asm!(include_str!("arch/riscv/kernelvec.S"));
+global_asm!(include_str!("arch/riscv/trampoline.S"));
+global_asm!(include_str!("arch/riscv/swtch.S"));
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
-    println!("Hello RISCV!");
-    trap::init();
+    use crate::riscv::*;
 
-    println!("Testing breakpoint...");
-    // 使用内联汇编直接插入 ebreak 指令
-    unsafe {
-        core::arch::asm!("ebreak", options(nomem, nostack));
+    let hart_id = unsafe { r_mhartid() };
+    if hart_id == 0 {
+        kernel_init();
+        set_started(true);
+    } else {
+        while !get_started() {}
+        println!("Hart {} starting", hart_id);
+        hart_init();
     }
 
-    println!("Successfully handled breakpoint!");
-    loop {}
+    unsafe { scheduler() };
 }
+
+fn set_started(started: bool) {
+    STARTED.store(started, Ordering::SeqCst);
+}
+
+fn get_started() -> bool {
+    STARTED.load(Ordering::SeqCst)
+}
+
+fn kernel_init() {
+    unsafe { crate::console::consoleinit() };
+    println!("Console initialized.");
+    unsafe { crate::trap::trapinit() };
+    crate::proc::proc_init();
+    println!("Kernel initialized.");
+}
+
+
+fn hart_init() {
+    unsafe { crate::trap::trapinithart() };
+    unsafe { crate::plic::plicinithart() };
+}
+
 
 #[cfg(not(test))]
 #[panic_handler]

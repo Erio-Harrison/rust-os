@@ -7,9 +7,9 @@ use crate::{
     bio::{bread, brelse},
     file::Inode,
     log::Log,
-    param::NINODE,
+    param::{NINODE, ROOTDEV},
     println,
-    proc::{either_copyin, either_copyout},
+    proc::{either_copyin, either_copyout, myproc},
     sleeplock::Sleeplock,
     spinlock::SpinLock,
     stat::Stat,
@@ -115,6 +115,15 @@ pub struct DiskInode {
 pub struct Dirent {
     pub inum: u16,          // Inode number
     pub name: [u8; DIRSIZ], // File name
+}
+
+impl Dirent {
+    pub const fn new() -> Self {
+        Self {
+            inum: 0,
+            name: [0; DIRSIZ],
+        }
+    }
 }
 
 /// File type constants
@@ -473,6 +482,90 @@ impl Inode {
         self.update();
         tot as i32
     }
+
+        /// Compare two directory entry names
+        fn namecmp(s: &[u8], t: &[u8]) -> bool {
+            if s.len() != t.len() {
+                return false;
+            }
+            for i in 0..min(s.len(), DIRSIZ) {
+                if s[i] != t[i] {
+                    return false;
+                }
+            }
+            true
+        }
+    
+        /// Look for a directory entry in a directory.
+        /// If found, set *poff to byte offset of entry.
+        pub unsafe fn dirlookup(&mut self, name: &[u8], poff: Option<&mut u32>) -> Option<*mut Inode> {
+            if self.typ != T_DIR {
+                panic!("dirlookup not DIR");
+            }
+    
+            let mut de = Dirent::new();
+            let de_size = core::mem::size_of::<Dirent>() as u32;
+    
+            let mut off = 0;
+            while off < self.size {
+                if self.readi(
+                    false,
+                    &de as *const _ as u64,
+                    off,
+                    de_size
+                ) != de_size as i32 {
+                    panic!("dirlookup read");
+                }
+    
+                if de.inum != 0 && Self::namecmp(name, &de.name) {
+                    // entry matches path element
+                    if let Some(poff_ref) = poff {
+                        *poff_ref = off;
+                    }
+                    return Some(ITABLE.get(self.dev, de.inum.into()));
+                }
+    
+                off += de_size;
+            }
+    
+            None
+        }
+    
+        /// Write a new directory entry (name, inum) into the directory.
+        pub unsafe fn dirlink(&mut self, name: &[u8], inum: u32) -> i32 {
+            // Check that name is not present
+            if let Some(ip) = self.dirlookup(name, None) {
+                ITABLE.put(ip);
+                return -1;
+            }
+    
+            let mut de = Dirent::new();
+            let de_size = core::mem::size_of::<Dirent>() as u32;
+    
+            // Look for an empty dirent
+            let mut off = 0;
+            while off < self.size {
+                if self.readi(false, &de as *const _ as u64, off, de_size) != de_size as i32 {
+                    panic!("dirlink read");
+                }
+                if de.inum == 0 {
+                    break;
+                }
+                off += de_size;
+            }
+    
+            // Copy name and inum
+            for i in 0..min(name.len(), DIRSIZ) {
+                de.name[i] = name[i];
+            }
+            de.inum = inum as u16;
+    
+            if self.writei(false, &de as *const _ as u64, off, de_size) != de_size as i32 {
+                return -1;
+            }
+    
+            0
+        }
 }
 
 impl InodeTable {
@@ -622,4 +715,105 @@ impl InodeTable {
         self.unlock(ip);
         self.put(ip);
     }
+}
+
+/// Path utilities
+pub struct Path;
+
+impl Path {
+    /// Skip over slashes and copy next path element into name.
+    /// Returns remaining path.
+    pub unsafe fn skipelem(path: *const u8, name: *mut u8) -> Option<*const u8> {
+        let mut path = path;
+        
+        // Skip leading slashes
+        while *path == b'/' {
+            path = path.add(1);
+        }
+        if *path == 0 {
+            return None;
+        }
+
+        let s = path;
+        while *path != b'/' && *path != 0 {
+            path = path.add(1);
+        }
+        let len = path.offset_from(s) as usize;
+
+        // Copy name
+        if len >= DIRSIZ {
+            ptr::copy_nonoverlapping(s, name, DIRSIZ);
+        } else {
+            ptr::copy_nonoverlapping(s, name, len);
+            *name.add(len) = 0;
+        }
+
+        // Skip trailing slashes
+        while *path == b'/' {
+            path = path.add(1);
+        }
+
+        Some(path)
+    }
+
+    /// Look up and return the inode for a path name.
+    /// If parent is true, return the inode for the parent and copy the final
+    /// path element into name, which must have room for DIRSIZ bytes.
+    pub unsafe fn namex(
+        path: *const u8,
+        nameiparent: bool,
+        name: *mut u8
+    ) -> Option<*mut Inode> {
+        // Get starting point
+        let mut ip = if *path == b'/' {
+            ITABLE.get(ROOTDEV.try_into().unwrap(), ROOTINO)
+        } else {
+            let p = myproc();
+            ITABLE.dup((*p).cwd)
+        };
+
+        let mut path = path;
+        while let Some(next_path) = Self::skipelem(path, name) {
+            ITABLE.lock(ip);
+
+            if (*ip).typ != T_DIR {
+                ITABLE.unlockput(ip);
+                return None;
+            }
+
+            if nameiparent && *next_path == 0 {
+                // Stop one level early
+                ITABLE.unlock(ip);
+                return Some(ip);
+            }
+
+            if let Some(next) = (*ip).dirlookup(core::slice::from_raw_parts(name, DIRSIZ), None) {
+                ITABLE.unlockput(ip);
+                ip = next;
+            } else {
+                ITABLE.unlockput(ip);
+                return None;
+            }
+
+            path = next_path;
+        }
+
+        if nameiparent {
+            ITABLE.put(ip);
+            None
+        } else {
+            Some(ip)
+        }
+    }
+}
+
+/// Look up the inode for a path
+pub unsafe fn namei(path: *const u8) -> Option<*mut Inode> {
+    let mut name = [0u8; DIRSIZ];
+    Path::namex(path, false, name.as_mut_ptr())
+}
+
+/// Look up the parent inode for a path and copy last element into name
+pub unsafe fn nameiparent(path: *const u8, name: *mut u8) -> Option<*mut Inode> {
+    Path::namex(path, true, name)
 }

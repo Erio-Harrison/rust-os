@@ -1,28 +1,18 @@
-// src/trap/mod.rs
+// src/trap.rs
+use crate::{memlayout::{TRAMPOLINE, UART0_IRQ, VIRTIO0_IRQ}, 
+plic::{plic_claim, plic_complete}, println, 
+proc::{cpuid, exit, myproc, wakeup, yield_proc},
+ riscv::{intr_get, intr_off, intr_on, make_satp, r_satp, r_scause, r_sepc, r_sstatus, r_stval, r_time, r_tp, w_sepc, w_sstatus, w_stimecmp, w_stvec, PGSIZE, SSTATUS_SPIE, SSTATUS_SPP}, spinlock::SpinLock, syscall::syscall,
+  types::uint64};
 
-use core::arch::asm;
+pub static mut TICKSLOCK: SpinLock = SpinLock::new("time\0".as_bytes().as_ptr());
+pub static mut TICKS: usize = 0;
 
-use crate::println;
-
-// Define CSR register operation macro
-macro_rules! read_csr {
-    ($reg:literal) => {
-        {
-            let value: usize;
-            unsafe {
-                asm!(concat!("csrr {}, ", $reg), out(reg) value);
-            }
-            value
-        }
-    };
-}
-
-macro_rules! write_csr {
-    ($reg:literal, $value:expr) => {
-        unsafe {
-            asm!(concat!("csrw ", $reg, ", {}"), in(reg) $value);
-        }
-    };
+extern "C" {
+    fn trampoline();
+    fn uservec();
+    fn userret();
+    fn kernelvec();
 }
 
 // Interrupt context structure
@@ -64,6 +54,12 @@ pub struct TrapContext {
     // CSR Register
     pub sstatus: usize,
     pub sepc: usize,
+
+    // Kernel registers
+    pub kernel_satp: usize, // kernel page table
+    pub kernel_sp: usize, // kernel stack pointer
+    pub kernel_trap: usize, // trap processing function address
+    pub kernel_hartid: usize, // hart id
 }
 
 impl TrapContext {
@@ -102,30 +98,23 @@ impl TrapContext {
             t6: 0,
             sstatus: 0,
             sepc: 0,
+            kernel_satp: 0,
+            kernel_sp: 0,
+            kernel_trap: 0,
+            kernel_hartid: 0,
         }
     }
+    
 }
 
-// Initialize trap processing
-pub fn init() {
-    extern "C" {
-        fn __alltraps();
-    }
+/// Initialize trap module
+pub unsafe fn trapinit() {
+    TICKSLOCK.initlock("time\0".as_bytes().as_ptr());
+}
 
-    println!("Setting up trap handler at {:#x}", __alltraps as usize);
-
-    // Set stvec to use Direct mode
-    write_csr!("stvec", __alltraps as usize);
-
-    // Setting the privilege level
-    unsafe {
-        // Make sure you are in S mode
-        asm!("csrw sstatus, {}", in(reg) 0x100);
-    }
-
-    println!("Current sstatus: {:#x}", read_csr!("sstatus"));
-    println!("Current sie: {:#x}", read_csr!("sie"));
-    println!("Trap handler setup complete!");
+/// Set up to take exceptions and traps while in the kernel
+pub unsafe fn trapinithart() {
+    w_stvec(kernelvec as u64);
 }
 
 // Trap Type Enumeration
@@ -168,47 +157,198 @@ fn parse_scause(scause: usize) -> (TrapType, u64) {
     (trap_type, code)
 }
 
+/// Handle an interrupt, exception, or system call from user space.
+/// Called from trampoline.S
 #[no_mangle]
-pub extern "C" fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
-    let scause = read_csr!("scause");
-    let stval = read_csr!("stval");
+pub unsafe fn usertrap() {
+    let mut which_dev = 0;
 
-    println!("Trap handler entered!");
-    println!(
-        "scause: {:#x}, stval: {:#x}, sepc: {:#x}",
-        scause, stval, cx.sepc
-    );
+    if (r_sstatus() & SSTATUS_SPP) != 0 {
+        panic!("usertrap: not from user mode");
+    }
 
-    let (trap_type, code) = parse_scause(scause);
-    println!("Trap type: {:?}, code: {}", trap_type, code);
+    // Send interrupts and exceptions to kerneltrap(),
+    // since we're now in the kernel.
+    w_stvec(kernelvec as u64);
 
-    match trap_type {
-        TrapType::Exception => {
-            match code {
-                3 => {
-                    println!("Breakpoint at 0x{:x}", cx.sepc);
-                    cx.sepc += 2; // ebreak is a 2-byte instruction
-                    return cx;
-                }
-                7 => {
-                    // Store/AMO access fault
-                    println!("Store access fault at address 0x{:x}", stval);
-                    panic!("Store access fault!");
-                }
-                5 => {
-                    // Load access fault
-                    println!("Load access fault at address 0x{:x}", stval);
-                    panic!("Load access fault!");
-                }
-                _ => {
-                    println!("Unknown exception code: {}", code);
-                    panic!("Unhandled exception! code={}", code);
-                }
-            }
+    let p = myproc();
+
+    // Save user program counter.
+    (*(*p).trapframe).epc = r_sepc();
+
+    let scause = r_scause();
+    if scause == 8 {
+        // System call
+        if (*p).killed != 0 {
+            exit(-1);
         }
-        TrapType::Interrupt => {
-            println!("Got interrupt, code: {}", code);
-            panic!("Unhandled interrupt!");
+
+        // sepc points to the ecall instruction,
+        // but we want to return to the next instruction.
+        (*(*p).trapframe).epc += 4;
+
+        // An interrupt will change sepc, scause, and sstatus,
+        // so enable only now that we're done with those registers.
+        intr_on();
+
+        syscall();
+    } else {
+        which_dev = devintr();
+        if which_dev == 0 {
+            println!(
+                "usertrap(): unexpected scause {:#x} pid={}",
+                scause,
+                (*p).pid
+            );
+            println!(
+                "            sepc={:#x} stval={:#x}",
+                r_sepc(), 
+                r_stval()
+            );
+            (*p).killed = 1;
         }
+    }
+
+    if (*p).killed != 0 {
+        exit(-1);
+    }
+
+    // Give up the CPU if this is a timer interrupt.
+    if which_dev == 2 {
+        yield_proc();
+    }
+
+    usertrapret();
+}
+/// Return to user space
+pub unsafe fn usertrapret() {
+    let p = myproc();
+
+    // We're about to switch the destination of traps from
+    // kerneltrap() to usertrap(), so turn off interrupts until
+    // we're back in user space, where usertrap() is correct.
+    intr_off();
+
+    // Send syscalls, interrupts, and exceptions to uservec in trampoline.S
+    let trampoline_uservec = TRAMPOLINE + (uservec as u64 - trampoline as u64);
+    w_stvec(trampoline_uservec);
+
+    // Set up trapframe values that uservec will need when
+    // the process next traps into the kernel.
+    (*(*p).trapframe).kernel_satp = r_satp();          // kernel page table
+    (*(*p).trapframe).kernel_sp = (*p).kstack + PGSIZE;        // process's kernel stack
+    (*(*p).trapframe).kernel_trap = usertrap as u64;
+    (*(*p).trapframe).kernel_hartid = r_tp();    // hartid for cpuid()
+
+    // Set up the registers that trampoline.S's sret will use
+    // to get to user space.
+    
+    // Set S Previous Privilege mode to User.
+    let mut sstatus = r_sstatus();
+    sstatus &= !SSTATUS_SPP;  // clear SPP to 0 for user mode
+    sstatus |= SSTATUS_SPIE;  // enable interrupts in user mode
+    w_sstatus(sstatus);
+
+    // Set S Exception Program Counter to the saved user pc.
+    w_sepc((*(*p).trapframe).epc);
+
+    // Tell trampoline.S the user page table to switch to.
+    let satp = make_satp(((*p).pagetable as usize).try_into().unwrap());
+
+    // Jump to userret in trampoline.S at the top of memory, which
+    // switches to the user page table, restores user registers,
+    // and switches to user mode with sret.
+    let trampoline_userret = TRAMPOLINE + (userret as u64 - trampoline as u64);
+    let fn_: extern "C" fn(usize) = core::mem::transmute(trampoline_userret);
+    fn_(satp.try_into().unwrap());
+}
+
+/// Interrupts and exceptions from kernel code go here via kernelvec,
+/// on whatever the current kernel stack is.
+#[no_mangle]
+pub unsafe fn kerneltrap() {
+    let mut which_dev = 0;
+    let sepc = r_sepc();
+    let sstatus = r_sstatus();
+    let scause = r_scause();
+
+    if (sstatus & SSTATUS_SPP) == 0 {
+        panic!("kerneltrap: not from supervisor mode");
+    }
+    if intr_get() {
+        panic!("kerneltrap: interrupts enabled");
+    }
+
+    which_dev = devintr();
+    if which_dev == 0 {
+        println!("scause={:#x}", scause);
+        println!("sepc={:#x}", sepc);
+        println!("stval={:#x}", r_stval());
+        panic!("kerneltrap");
+    }
+
+    // Give up the CPU if this is a timer interrupt.
+    if which_dev == 2 && !myproc().is_null() {
+        yield_proc();
+    }
+
+    // The yield() may have caused some traps to occur,
+    // so restore trap registers for use by kernelvec.S's sepc instruction.
+    w_sepc(sepc);
+    w_sstatus(sstatus);
+}
+
+unsafe fn clockintr() {
+    if cpuid() == 0 {
+        TICKSLOCK.acquire();
+        TICKS += 1;
+        wakeup(&TICKS as *const _ as *mut u8);
+        TICKSLOCK.release();
+    }
+
+    // Ask for the next timer interrupt. This also clears
+    // the interrupt request. 1000000 is about a tenth of a second.
+    w_stimecmp(r_time() + 1000000);
+}
+
+use crate::virtio::DISK;
+
+/// Check if it's an external interrupt or software interrupt,
+/// and handle it.
+/// Returns 2 if timer interrupt,
+/// 1 if other device,
+/// 0 if not recognized.
+unsafe fn devintr() -> i32 {
+    let scause =  r_scause();
+
+    if scause == 0x8000000000000009 {
+        // This is a supervisor external interrupt, via PLIC.
+
+        // irq indicates which device interrupted.
+        let irq = plic_claim();
+
+        if irq == UART0_IRQ as i32 {
+            //uartintr();
+            println!("I am testing!")
+        } else if irq == VIRTIO0_IRQ as i32 {
+            DISK.virtio_disk_intr();
+        } else if irq != 0 {
+            println!("unexpected interrupt irq={}", irq);
+        }
+
+        // The PLIC allows each device to raise at most one
+        // interrupt at a time; tell the PLIC the device is
+        // now allowed to interrupt again.
+        if irq != 0 {
+            plic_complete(irq);
+        }
+
+        1
+    } else if scause == 0x8000000000000005 {
+        // Timer interrupt.
+        clockintr();
+        2
+    } else {
+        0
     }
 }

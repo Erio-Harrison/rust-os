@@ -1,44 +1,46 @@
-use crate::{memlayout::*, param::NCPU, riscv::*};
-use core::arch::asm;
+use crate::{riscv::*, uart::{self, debug_print}};
 
 extern "C" {
-    fn main() -> !;
+    fn rust_main() -> !;
 }
 
-/// Machine mode startup code
-#[no_mangle]
 pub unsafe extern "C" fn start() -> ! {
-    // Set M Previous Privilege mode to Supervisor, for mret
+    // 初始化UART
+    uart::uartinit();
+    
+    debug_print("xv6 kernel is booting\n");
+
+    // Set M Previous Privilege mode to Supervisor
     let mut x = r_mstatus();
     x &= !MSTATUS_MPP_MASK;
     x |= MSTATUS_MPP_S;
     w_mstatus(x);
 
-    // Set M Exception Program Counter to main, for mret
-    w_mepc(main as u64);
+    // Set M Exception Program Counter to main
+    w_mepc(rust_main as u64);
 
-    // Disable paging for now
+    // Disable paging
     w_satp(0);
 
-    // Delegate all interrupts and exceptions to supervisor mode
+    // Delegate interrupts and exceptions
     w_medeleg(0xffff);
     w_mideleg(0xffff);
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
 
     // Configure Physical Memory Protection
-    w_pmpaddr0(0x3fffffffffffffffu64);
+    w_pmpaddr0(0x3fffffffffffff as u64);
     w_pmpcfg0(0xf);
 
-    // Ask for clock interrupts
-    timerinit();
-
-    // Keep each CPU's hartid in its tp register, for cpuid()
+    // Store hartid in tp for cpuid()
     let id = r_mhartid();
     w_tp(id);
+  
+    // Initialize timer interrupts
+    timerinit();
 
     // Switch to supervisor mode and jump to main
     unsafe {
-        asm!("mret", options(noreturn));
+        core::arch::asm!("mret", options(noreturn));
     }
 }
 

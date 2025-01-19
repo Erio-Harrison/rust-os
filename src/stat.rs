@@ -13,3 +13,21 @@ pub struct Stat {
     pub nlink: i16, // Number of links to file
     pub size: u64,  // Size of file in bytes
 }
+
+impl Stat {
+    pub fn new() -> Self {
+        Self {
+            dev: 0,
+            ino: 0,
+            typ: 0,
+            nlink: 0,
+            size: 0,
+        }
+    }
+}
+
+impl Default for Stat {
+    fn default() -> Self {
+        Self::new()
+    }
+}

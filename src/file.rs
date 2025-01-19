@@ -5,12 +5,25 @@ use crate::proc::myproc;
 use crate::sleeplock::Sleeplock;
 use crate::spinlock::SpinLock;
 use crate::stat::Stat;
+use crate::vm::copyout;
 
 /// File types
 pub const FD_NONE: i32 = 0; // Free file descriptor
 pub const FD_PIPE: i32 = 1; // Pipe
 pub const FD_INODE: i32 = 2; // Inode
 pub const FD_DEVICE: i32 = 3; // Device
+pub const CONSOLE: usize = 1;
+
+#[derive(Copy, Clone)]
+pub struct Devsw {
+    pub read: Option<unsafe fn(i32, u64, i32) -> i32>,
+    pub write: Option<unsafe fn(i32, u64, i32) -> i32>,
+}
+
+pub static mut DEVSW: [Devsw; NDEV] = [Devsw {
+    read: None,
+    write: None,
+}; NDEV];
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -41,6 +54,7 @@ pub struct Inode {
     pub addrs: [u32; NDIRECT + 1],
 }
 
+
 /// File table
 pub struct FileTable {
     lock: SpinLock,
@@ -56,8 +70,8 @@ pub static mut FTABLE: FileTable = FileTable {
         readable: false,
         writable: false,
         pipe: core::ptr::null_mut(),
-        inode: core::ptr::null_mut(),
-        offset: 0,
+        ip: core::ptr::null_mut(),
+        off: 0,
         major: 0,
     }; NFILE],
 };
@@ -145,19 +159,19 @@ impl FileTable {
             FD_DEVICE => {
                 if (*f).major < 0
                     || (*f).major as usize >= NDEV
-                    || devsw[(*f).major as usize].read.is_none()
+                    || DEVSW[(*f).major as usize].read.is_none()
                 {
                     return -1;
                 }
-                devsw[(*f).major as usize].read.unwrap()(1, addr, n)
+                DEVSW[(*f).major as usize].read.unwrap()(1, addr, n)
             }
             FD_INODE => {
                 ITABLE.lock((*f).ip);
-                let r = readi((*f).inode, true, addr, (*f).offset, n as u32);
+                let r = (*(*f).ip).readi(true, addr, (*f).off, n as u32);
                 if r > 0 {
-                    (*f).offset += r as u32;
+                    (*f).off += r as u32;
                 }
-                ITABLE.unlock((*f).inode);
+                ITABLE.unlock((*f).ip);
                 r
             }
             _ => panic!("fileread"),
@@ -179,17 +193,16 @@ impl FileTable {
             FD_DEVICE => {
                 if (*f).major < 0
                     || (*f).major as usize >= NDEV
-                    || devsw[(*f).major as usize].write.is_none()
+                    || DEVSW[(*f).major as usize].write.is_none()
                 {
                     return -1;
                 }
-                devsw[(*f).major as usize].write.unwrap()(1, addr, n)
+                DEVSW[(*f).major as usize].write.unwrap()(1, addr, n)
             }
             FD_INODE => {
                 // Maximum write size
                 let max = ((MAXOPBLOCKS - 4) / 2) * BSIZE;
                 let mut i = 0;
-                let mut ret = 0;
 
                 while i < n {
                     let n1 = core::cmp::min(n - i, max as i32);
@@ -197,9 +210,9 @@ impl FileTable {
                     FS.log.begin_op();
                     ITABLE.lock((*f).ip);
 
-                    let r = writei((*f).ip, true, addr + i as u64, (*f).offset, n1 as u32);
+                    let r = (*(*f).ip).writei(true, addr + i as u64, (*f).off, n1 as u32);
                     if r > 0 {
-                        (*f).offset += r as u32;
+                        (*f).off += r as u32;
                     }
 
                     ITABLE.unlock((*f).ip);
@@ -230,14 +243,14 @@ impl FileTable {
         match (*f).typ {
             FD_INODE | FD_DEVICE => {
                 ITABLE.lock((*f).ip);
-                stati((*f).ip, &mut st);
+                (*(*f).ip).stati(&mut st);
                 ITABLE.unlock((*f).ip);
 
                 if copyout(
-                    (*p).pagetable,
+                    (*p).pagetable as *mut usize,
                     addr,
                     &st as *const _ as *const u8,
-                    core::mem::size_of::<Stat>(),
+                    core::mem::size_of::<Stat>() as u64,
                 ) < 0
                 {
                     return -1;

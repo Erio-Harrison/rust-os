@@ -1,17 +1,24 @@
+use core::arch::global_asm;
 use core::ptr;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use super::file::File;
 use super::spinlock::SpinLock;
+use crate::file::FTABLE;
+use crate::fs::{namei, FS, ITABLE};
 use crate::memlayout::{KSTACK, TRAMPOLINE, TRAPFRAME};
 use crate::riscv::{intr_get, intr_on, PageTable, PGSIZE, PTE_R, PTE_W, PTE_X};
+use crate::trap::usertrapret;
 use crate::types::uint;
 use crate::vm::{
     copyin, copyout, mappages, uvmalloc, uvmcopy, uvmcreate, uvmdealloc, uvmfirst, uvmfree,
     uvmunmap,
 };
-use crate::{param::*, println, riscv};
+use crate::{param::*, println, riscv, uart};
 
+extern "C" {
+    fn swtch(old: *mut Context, new: *mut Context);
+}
 /// Registers saved for kernel context switches
 #[repr(C)]
 #[derive(Copy, Clone, Default)] // Add these derives
@@ -44,6 +51,7 @@ pub struct Cpu {
 
 /// Trap frame, for saving user registers
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct TrapFrame {
     pub kernel_satp: u64,   // kernel page table
     pub kernel_sp: u64,     // top of process's kernel stack
@@ -135,7 +143,7 @@ fn cpu_init() -> Cpu {
 }
 
 /// Initialize a new process state
-fn proc_init() -> Proc {
+pub(crate) fn proc_init() -> Proc {
     Proc {
         lock: SpinLock::new(b"proc\0" as *const u8),
         state: ProcState::UNUSED,
@@ -389,8 +397,7 @@ pub unsafe fn userinit() {
     (*(*p).trapframe).sp = PGSIZE; // user stack pointer
 
     ptr::copy_nonoverlapping(b"initcode\0".as_ptr(), (*p).name.as_mut_ptr(), 9);
-    (*p).cwd = namei("/\0".as_ptr());
-
+    (*p).cwd = namei("/\0".as_ptr()).expect("userinit: namei failed");
     (*p).state = ProcState::RUNNABLE;
     (*p).lock.release();
 }
@@ -454,10 +461,10 @@ pub unsafe fn fork() -> i32 {
     // increment reference counts on open file descriptors.
     for i in 0..NOFILE {
         if !(*p).ofile[i].is_null() {
-            (*np).ofile[i] = filedup((*p).ofile[i]);
+            (*np).ofile[i] = FTABLE.dup((*p).ofile[i]);
         }
     }
-    (*np).cwd = idup((*p).cwd);
+    (*np).cwd = ITABLE.dup((*p).cwd);
 
     // copy process name
     ptr::copy_nonoverlapping((*p).name.as_ptr(), (*np).name.as_mut_ptr(), 16);
@@ -483,7 +490,7 @@ unsafe fn reparent(p: *mut Proc) {
     for pp in PROCS.iter_mut() {
         if (*pp).parent == p {
             (*pp).parent = INITPROC;
-            wakeup(INITPROC);
+            wakeup(INITPROC as *mut u8);
         }
     }
 }
@@ -501,14 +508,14 @@ pub unsafe fn exit(status: i32) -> ! {
     // Close all open files.
     for fd in 0..NOFILE {
         if !(*p).ofile[fd].is_null() {
-            fileclose((*p).ofile[fd]);
+            FTABLE.close((*p).ofile[fd]);
             (*p).ofile[fd] = ptr::null_mut();
         }
     }
 
-    begin_op();
-    iput((*p).cwd);
-    end_op();
+    FS.log.begin_op();
+    ITABLE.put((*p).cwd);
+    FS.log.end_op();
     (*p).cwd = ptr::null_mut();
 
     WAIT_LOCK.acquire();
@@ -517,7 +524,7 @@ pub unsafe fn exit(status: i32) -> ! {
     reparent(p);
 
     // Parent might be sleeping in wait().
-    wakeup((*p).parent);
+    wakeup((*p).parent as *mut u8);
 
     (*p).lock.acquire();
 
@@ -553,7 +560,7 @@ pub unsafe fn wait(addr: u64) -> i32 {
                     let pid = (*pp).pid;
                     if addr != 0
                         && copyout(
-                            (*p).pagetable,
+                            (*p).pagetable as *mut usize,
                             addr,
                             &(*pp).xstate as *const i32 as *const u8,
                             core::mem::size_of::<i32>() as u64,
@@ -574,13 +581,13 @@ pub unsafe fn wait(addr: u64) -> i32 {
         }
 
         // No point waiting if we don't have any children.
-        if !havekids || killed(p) {
+        if !havekids || killed(p){
             WAIT_LOCK.release();
             return -1;
         }
 
         // Wait for a child to exit.
-        sleep(p, &WAIT_LOCK); //DOC: wait-sleep
+        sleep(p as *mut u8, &mut WAIT_LOCK); //DOC: wait-sleep
     }
 }
 
@@ -592,6 +599,7 @@ pub unsafe fn wait(addr: u64) -> i32 {
 ///  - eventually that process transfers control
 ///    via swtch back to the scheduler.
 pub unsafe fn scheduler() -> ! {
+    uart::uartputc(b'C');  // 进入调度器
     let c = mycpu();
     (*c).proc = ptr::null_mut();
 
@@ -610,8 +618,7 @@ pub unsafe fn scheduler() -> ! {
                 // before jumping back to us.
                 (*p).state = ProcState::RUNNABLE;
                 (*c).proc = p;
-                swtch(&(*c).context, &(*p).context);
-
+                swtch(&mut (*p).context, &mut (*c).context);
                 // Process is done running for now.
                 // It should have changed its p->state before coming back.
                 (*c).proc = ptr::null_mut();
@@ -653,7 +660,7 @@ pub unsafe fn sched() {
     }
 
     let intena = (*c).intena;
-    swtch(&(*p).context, &(*c).context);
+    swtch(&mut (*p).context, &mut (*c).context);
     (*c).intena = intena;
 }
 
@@ -679,7 +686,7 @@ pub unsafe fn forkret() {
         // File system initialization must be run in the context of a
         // regular process (e.g., because it calls sleep), and thus cannot
         // be run from main().
-        fsinit(ROOTDEV);
+        FS.init(ROOTDEV.try_into().unwrap());
 
         // Ensure other cores see first=false.
         // The `swap` operation above already ensures synchronization,
@@ -757,11 +764,13 @@ pub unsafe fn setkilled(p: *mut Proc) {
     (*p).lock.release();
 }
 
-pub unsafe fn killed(p: *mut Proc) -> uint {
+/// Check if a process is marked as killed
+#[inline]
+pub unsafe fn killed(p: *mut Proc) -> bool {
     (*p).lock.acquire();
-    let k = (*p).killed;
+    let k = (*p).killed != 0; 
     (*p).lock.release();
-    k.try_into().unwrap()
+    k
 }
 
 /// Copy to either a user address, or kernel address,
@@ -783,7 +792,7 @@ pub unsafe fn either_copyout(user_dst: bool, dst: u64, src: *const u8, len: u64)
 pub unsafe fn either_copyin(dst: *mut u8, user_src: bool, src: u64, len: u64) -> i32 {
     let p = myproc();
     if user_src {
-        copyin((*p).pagetable, dst, src, len)
+        copyin((*p).pagetable as *mut usize , dst, src, len)
     } else {
         ptr::copy_nonoverlapping(src as *const u8, dst, len as usize);
         0

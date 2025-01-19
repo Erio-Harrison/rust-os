@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
+panic = "abort"
 debug = true
 
 [profile.release]
 opt-level = 3
+panic = "abort"
