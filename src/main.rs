@@ -34,6 +34,7 @@ pub mod syscall;
 use core::arch::global_asm;
 use core::panic::PanicInfo;
 use proc::scheduler;
+use riscv::r_mhartid;
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -50,7 +51,11 @@ global_asm!(include_str!("arch/riscv/swtch.S"));
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
-    use crate::riscv::*;
+    unsafe { 
+        crate::uart::uartinit();
+        crate::console::consoleinit();
+    }
+    println!("xv6 kernel is booting");
 
     let hart_id = unsafe { r_mhartid() };
     if hart_id == 0 {

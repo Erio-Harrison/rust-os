@@ -1,21 +1,25 @@
 .section .text.entry
-.globl _start
+.global _entry
 
-_start:
-    # 设置栈指针
-    la sp, boot_stack_top
-    
-    # 存储返回地址
-    addi sp, sp, -16
-    sd ra, 8(sp)
-    
-    # 直接跳转到start
-    tail start      # 使用tail call 而不是普通的call
+_entry:
+    # set up a stack for C.
+    la sp, stack0
+    li a0, 1024*4
+    csrr a1, mhartid
+    addi a1, a1, 1
+    mul a0, a0, a1
+    add sp, sp, a0
 
-.section .bss.stack
+    # jump to start() in start.rs
+    call start
+
+spin:
+    j spin
+
+.section .bss
 .align 12
-.globl boot_stack
-boot_stack:
-    .space 4096 * 16
-.globl boot_stack_top
-boot_stack_top:
+.global stack0
+stack0:
+    .space 4096 * 8  # 8 CPUs, 4KB per CPU
+.global stack0_top
+stack0_top:

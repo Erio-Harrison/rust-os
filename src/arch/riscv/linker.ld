@@ -1,29 +1,33 @@
 OUTPUT_ARCH(riscv)
-ENTRY(_start)
+ENTRY(_entry)
 
 BASE_ADDRESS = 0x80200000;
 
 SECTIONS {
     . = BASE_ADDRESS;
-    
+
     .text : {
-        *(.text.entry)    /* entry code first */
+        *(.text.entry)
         *(.text .text.*)
     }
-    
-    .rodata : ALIGN(16) {
+
+    .rodata : {
+        . = ALIGN(16);
         *(.rodata .rodata.*)
     }
-    
-    .data : ALIGN(16) {
+
+    .data : {
+        . = ALIGN(16);
         *(.data .data.*)
     }
-    
-    .bss : ALIGN(16) {
-        *(.bss.stack)    /* stack section */
+
+    .bss : {
+        . = ALIGN(16);
+        stack0 = .;
+        . = . + (4096 * 8);  /* 8 CPUs, 4KB per CPU */
+        stack0_top = .;
         *(.bss .bss.*)
     }
-    
-    . = ALIGN(4096);
-    end = .;
+
+    PROVIDE(end = .);
 }
