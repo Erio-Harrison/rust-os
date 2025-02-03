@@ -1,4 +1,4 @@
-use crate::types::uint64;
+use crate::{println, types::uint64};
 
 // Machine Status Register (mstatus) related constants
 pub const MSTATUS_MPP_MASK: uint64 = 3 << 11; // previous mode
@@ -9,11 +9,23 @@ pub const MSTATUS_MIE: uint64 = 1 << 3; // machine-mode interrupt enable
 
 /// Returns the hardware thread (hart) ID
 #[inline]
-pub unsafe fn r_mhartid() -> uint64 {
-    let x: uint64;
+pub unsafe fn r_mhartid() -> u64 {
+    let x: u64;
+    println!("First initial");
+
+    // Perform the csrr instruction and store the hart ID
     core::arch::asm!("csrr {}, mhartid", out(reg) x);
+
+    println!("After csrr instruction");
+
+    // Perform an explicit "nop" (no operation) to give QEMU more time or simulate a small delay
+    core::arch::asm!("nop");
+
+    println!("Second initial");
+
     x
 }
+
 
 /// Read machine status register (mstatus)
 #[inline(never)]
