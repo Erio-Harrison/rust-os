@@ -1,6 +1,6 @@
 use core::ptr::{read_volatile, write_volatile};
 
-use crate::{print, spinlock::{pop_off, push_off}};
+use crate::spinlock::{pop_off, push_off};
 
 // Physical address of UART
 const UART_BASE_ADDR: usize = 0x1000_0000;

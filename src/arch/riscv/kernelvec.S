@@ -1,4 +1,3 @@
-# 保存到单独的 .S 文件中，不要放在 Rust 代码里
 .section .text
 
 # interrupts and exceptions while in supervisor

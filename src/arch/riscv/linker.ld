@@ -1,10 +1,11 @@
 OUTPUT_ARCH(riscv)
-ENTRY(_entry)
+ENTRY(_start)
+BASE_ADDRESS = 0x80000000;
 
-BASE_ADDRESS = 0x80200000;
-
-SECTIONS {
+SECTIONS
+{
     . = BASE_ADDRESS;
+    skernel = .;
 
     .text : {
         *(.text.entry)
@@ -12,22 +13,14 @@ SECTIONS {
     }
 
     .rodata : {
-        . = ALIGN(16);
         *(.rodata .rodata.*)
     }
 
     .data : {
-        . = ALIGN(16);
         *(.data .data.*)
     }
 
     .bss : {
-        . = ALIGN(16);
-        stack0 = .;
-        . = . + (4096 * 8);  /* 8 CPUs, 4KB per CPU */
-        stack0_top = .;
         *(.bss .bss.*)
     }
-
-    PROVIDE(end = .);
 }

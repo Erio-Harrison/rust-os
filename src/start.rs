@@ -1,4 +1,4 @@
-use crate::riscv::*;
+use crate::{riscv::*, uart::uartputc_sync};
 
 extern "C" {
     fn rust_main() -> !;
@@ -7,6 +7,11 @@ extern "C" {
 #[no_mangle]
 #[link_section = ".text"]
 pub unsafe extern "C" fn start() -> ! {
+    // Debug
+    unsafe {
+        uartputc_sync(b'A');
+    }
+    
     let mut x = r_mstatus();
     x &= !MSTATUS_MPP_MASK;
     x |= MSTATUS_MPP_S;
@@ -17,7 +22,6 @@ pub unsafe extern "C" fn start() -> ! {
 
     // Disable paging
     w_satp(0);
-
 
     w_medeleg(0xffff);
     w_mideleg(0xffff);

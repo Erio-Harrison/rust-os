@@ -1,6 +1,5 @@
 .section .text
 
-# 上下文切换
 # void swtch(struct context *old, struct context *new)
 
 .globl swtch
