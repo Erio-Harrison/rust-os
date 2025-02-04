@@ -110,3 +110,23 @@ The complete workflow is as follows (corresponding to the image above):
    - The code in `boot.S` sets the stack pointer and jumps to the Rust code, and the main logic of the operating system starts running.
 
 At this point, the general framework of our operating system is established. In the next section, we will implement the basic `print` functionality.
+
+Provide a debugging method:
+
+Change the `runner` in `config.toml` to:
+
+```bash
+runner = "qemu-system-riscv64 -machine virt -nographic -bios none -s -S -kernel"
+```
+
+Run the following command:
+
+```bash
+cargo run
+```
+
+Then open a new terminal, navigate to the project root directory, and execute the following command:
+
+```bash
+riscv64-unknown-elf-gdb target/riscv64gc-unknown-none-elf/debug/rust-os
+```
