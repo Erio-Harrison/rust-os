@@ -14,8 +14,8 @@
 //!             -kernel loads the kernel here
 //! unused RAM after 80000000.
 
-use crate::riscv::MAXVA;
-pub use crate::riscv::PGSIZE;
+use crate::riscv_local::MAXVA;
+pub use crate::riscv_local::PGSIZE;
 
 // qemu puts UART registers here in physical memory.
 pub const UART0: u64 = 0x1000_0000;

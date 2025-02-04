@@ -1,4 +1,4 @@
-use crate::{riscv::*, uart::uartputc_sync};
+use crate::{riscv_local::*, uart::uartputc_sync};
 
 extern "C" {
     fn rust_main() -> !;

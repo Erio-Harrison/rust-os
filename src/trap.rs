@@ -2,7 +2,7 @@
 use crate::{memlayout::{TRAMPOLINE, UART0_IRQ, VIRTIO0_IRQ}, 
 plic::{plic_claim, plic_complete}, println, 
 proc::{cpuid, exit, myproc, wakeup, yield_proc},
- riscv::{intr_get, intr_off, intr_on, make_satp, r_satp, r_scause, r_sepc, r_sstatus, r_stval, r_time, r_tp, w_sepc, w_sstatus, w_stimecmp, w_stvec, PGSIZE, SSTATUS_SPIE, SSTATUS_SPP}, spinlock::SpinLock, syscall::syscall,
+ riscv_local::{intr_get, intr_off, intr_on, make_satp, r_satp, r_scause, r_sepc, r_sstatus, r_stval, r_time, r_tp, w_sepc, w_sstatus, w_stimecmp, w_stvec, PGSIZE, SSTATUS_SPIE, SSTATUS_SPP}, spinlock::SpinLock, syscall::syscall,
   types::uint64};
 
 pub static mut TICKSLOCK: SpinLock = SpinLock::new("time\0".as_bytes().as_ptr());

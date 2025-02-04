@@ -8,6 +8,9 @@ opt-level = 0
 panic = "abort"
 debug = true
 
+[dependencies]
+riscv = "0.6.0"
+
 [profile.release]
 opt-level = 3
 panic = "abort"

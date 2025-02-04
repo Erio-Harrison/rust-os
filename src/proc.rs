@@ -7,14 +7,14 @@ use super::spinlock::SpinLock;
 use crate::file::FTABLE;
 use crate::fs::{namei, FS, ITABLE};
 use crate::memlayout::{KSTACK, TRAMPOLINE, TRAPFRAME};
-use crate::riscv::{intr_get, intr_on, PageTable, PGSIZE, PTE_R, PTE_W, PTE_X};
+use crate::riscv_local::{intr_get, intr_on, PageTable, PGSIZE, PTE_R, PTE_W, PTE_X};
 use crate::trap::usertrapret;
 use crate::types::uint;
 use crate::vm::{
     copyin, copyout, mappages, uvmalloc, uvmcopy, uvmcreate, uvmdealloc, uvmfirst, uvmfree,
     uvmunmap,
 };
-use crate::{param::*, println, riscv, uart};
+use crate::{param::*, println, riscv_local, uart};
 
 extern "C" {
     fn swtch(old: *mut Context, new: *mut Context);
@@ -209,7 +209,7 @@ pub unsafe fn procinit() {
 /// to a different CPU.
 #[inline]
 pub unsafe fn cpuid() -> i32 {
-    riscv::r_tp() as i32
+    riscv_local::r_tp() as i32
 }
 
 /// Return this CPU's cpu struct.

@@ -1,7 +1,7 @@
 use super::spinlock::SpinLock;
 use crate::memlayout::*;
-use crate::riscv::pgroundup;
-use crate::riscv::*;
+use crate::riscv_local::pgroundup;
+use crate::riscv_local::*;
 use core::ptr::{self};
 
 /// Free memory node - forms a linked list of free pages

@@ -10,7 +10,7 @@ use crate::{
     kalloc::kalloc,
     memlayout::VIRTIO0,
     proc::{sleep, wakeup},
-    riscv::PGSIZE,
+    riscv_local::PGSIZE,
     sleeplock::Sleeplock,
     spinlock::SpinLock,
     string::memset,

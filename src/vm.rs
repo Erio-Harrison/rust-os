@@ -2,7 +2,7 @@ use crate::{
     kalloc::{kalloc, kfree},
     memlayout::{KERNBASE, PHYSTOP, PLIC, TRAMPOLINE, UART0, VIRTIO0},
     proc::proc_mapstacks,
-    riscv::{
+    riscv_local::{
         make_satp, pa2pte, pgrounddown, pgroundup, pte2pa, pte_flags, sfence_vma, w_satp, MAXVA,
         PGSIZE, PTE_R, PTE_U, PTE_V, PTE_W, PTE_X,
     },

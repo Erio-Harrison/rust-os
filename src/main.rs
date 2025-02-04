@@ -15,7 +15,7 @@ pub mod memlayout;
 pub mod param;
 pub mod pipe;
 pub mod proc;
-pub mod riscv;
+pub mod riscv_local;
 pub mod sleeplock;
 pub mod spinlock;
 pub mod start;
@@ -34,7 +34,7 @@ pub mod syscall;
 use core::arch::global_asm;
 use core::panic::PanicInfo;
 use proc::scheduler;
-use riscv::r_mhartid;
+use riscv_local::r_mhartid;
 
 use core::sync::atomic::{AtomicBool, Ordering};
 

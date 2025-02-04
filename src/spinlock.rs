@@ -1,5 +1,5 @@
 use crate::println;
-use crate::riscv::{self, intr_get, intr_off, intr_on};
+use crate::riscv_local::{self, intr_get, intr_off, intr_on};
 use crate::types::uint;
 
 /// Mutual exclusion spin lock
