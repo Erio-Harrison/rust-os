@@ -263,22 +263,15 @@ pub struct InodeTable {
 }
 
 /// Global inode table
-pub static mut ITABLE: InodeTable = InodeTable {
-    lock: SpinLock::new("itable\0".as_bytes().as_ptr()),
-    inodes: [Inode {
-        dev: 0,
-        inum: 0,
-        ref_count: 0,
-        lock: Sleeplock::new("inode\0".as_bytes().as_ptr()),
-        valid: false,
-        typ: 0,
-        major: 0,
-        minor: 0,
-        nlink: 0,
-        size: 0,
-        addrs: [0; NDIRECT + 1],
-    }; NINODE],
-};
+pub static mut ITABLE: InodeTable = unsafe { core::mem::zeroed() };
+
+/// Initialize the inode table
+pub unsafe fn itable_init() {
+    ITABLE.lock.initlock("itable\0".as_bytes().as_ptr());
+    for i in 0..NINODE {
+        ITABLE.inodes[i].lock.init("inode\0".as_bytes().as_ptr());
+    }
+}
 
 impl Inode {
     /// Create a new inode instance

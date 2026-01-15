@@ -8,24 +8,14 @@ pub const MSTATUS_MPP_U: uint64 = 0 << 11; // user mode
 pub const MSTATUS_MIE: uint64 = 1 << 3; // machine-mode interrupt enable
 
 /// Returns the hardware thread (hart) ID
+/// WARNING: This can only be called in Machine mode!
+/// In Supervisor mode, use r_tp() instead (hart ID is saved there by start())
 #[inline]
 pub unsafe fn r_mhartid() -> u64 {
     let x: u64;
-    println!("First initial");
-
-    // Perform the csrr instruction and store the hart ID
     core::arch::asm!("csrr {}, mhartid", out(reg) x);
-
-    println!("After csrr instruction");
-
-    // Perform an explicit "nop" (no operation) to give QEMU more time or simulate a small delay
-    core::arch::asm!("nop");
-
-    println!("Second initial");
-
     x
 }
-
 
 /// Read machine status register (mstatus)
 #[inline(never)]

@@ -39,7 +39,6 @@ pub struct File {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct Inode {
     pub dev: u32,        // Device number
     pub inum: u32,       // Inode number
@@ -133,7 +132,7 @@ impl FileTable {
 
         match ff.typ {
             FD_PIPE => {
-                // pipeclose(ff.pipe, ff.writable)
+                (*ff.pipe).close(ff.writable);
             }
             FD_INODE | FD_DEVICE => {
                 FS.log.begin_op();
@@ -153,8 +152,7 @@ impl FileTable {
 
         match (*f).typ {
             FD_PIPE => {
-                // piperead(f.pipe, addr, n)
-                -1
+                (*(*f).pipe).read(addr, n)
             }
             FD_DEVICE => {
                 if (*f).major < 0
@@ -187,8 +185,7 @@ impl FileTable {
 
         match (*f).typ {
             FD_PIPE => {
-                // pipewrite(f.pipe, addr, n)
-                -1
+                (*(*f).pipe).write(addr, n)
             }
             FD_DEVICE => {
                 if (*f).major < 0

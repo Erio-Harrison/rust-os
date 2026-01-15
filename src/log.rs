@@ -18,7 +18,6 @@ struct LogHeader {
 }
 
 /// Log structure for both memory and disk
-#[derive(Clone)]
 pub struct Log {
     lock: SpinLock,   // Protects the log
     start: i32,       // First log block

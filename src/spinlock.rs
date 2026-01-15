@@ -1,12 +1,11 @@
 use crate::println;
 use crate::riscv_local::{self, intr_get, intr_off, intr_on};
-use crate::types::uint;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// Mutual exclusion spin lock
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct SpinLock {
-    pub locked: uint,               // Is the lock held?
+    pub locked: AtomicUsize,        // Is the lock held? (0 = no, 1 = yes)
     pub name: *const u8,            // Name of lock, for debugging
     pub cpu: *mut super::proc::Cpu, // The CPU holding the lock
 }
@@ -15,7 +14,7 @@ impl SpinLock {
     /// Create a new spin lock instance
     pub const fn new(name: *const u8) -> Self {
         SpinLock {
-            locked: 0,
+            locked: AtomicUsize::new(0),
             name,
             cpu: core::ptr::null_mut(),
         }
@@ -25,7 +24,7 @@ impl SpinLock {
     #[inline]
     pub unsafe fn initlock(&mut self, name: *const u8) {
         self.name = name;
-        self.locked = 0;
+        self.locked.store(0, Ordering::Relaxed);
         self.cpu = core::ptr::null_mut();
     }
 
@@ -46,13 +45,9 @@ impl SpinLock {
         // Spin until we acquire the lock
         // On RISC-V, this compiles to an atomic swap instruction:
         //   amoswap.w.aq a5, a5, (s1)
-        while core::sync::atomic::AtomicUsize::new(1)
-            .compare_exchange(
-                0,
-                1,
-                core::sync::atomic::Ordering::Acquire,
-                core::sync::atomic::Ordering::Relaxed,
-            )
+        while self
+            .locked
+            .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
             .is_err()
         {
             // Hint to the processor that we're spinning
@@ -62,7 +57,7 @@ impl SpinLock {
         // Memory barrier to ensure that critical section memory accesses
         // happen strictly after lock acquisition
         // On RISC-V, this emits a fence instruction
-        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+        core::sync::atomic::fence(Ordering::SeqCst);
 
         // Record info about lock acquisition for holding() and debugging
         self.cpu = super::proc::mycpu();
@@ -84,12 +79,12 @@ impl SpinLock {
         // Memory barrier to ensure all stores in the critical section
         // are visible to other CPUs before the lock is released
         // On RISC-V, this emits a fence instruction
-        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+        core::sync::atomic::fence(Ordering::SeqCst);
 
         // Release the lock
         // On RISC-V, this compiles to an atomic swap instruction:
         //   amoswap.w zero, zero, (s1)
-        self.locked = 0;
+        self.locked.store(0, Ordering::Release);
 
         pop_off();
     }
@@ -100,7 +95,7 @@ impl SpinLock {
     /// - Interrupts must be off when calling this function
     #[inline]
     pub unsafe fn holding(&self) -> bool {
-        self.locked != 0 && self.cpu == super::proc::mycpu()
+        self.locked.load(Ordering::Relaxed) != 0 && self.cpu == super::proc::mycpu()
     }
 }
 

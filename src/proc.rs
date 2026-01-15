@@ -274,7 +274,7 @@ unsafe fn allocproc() -> *mut Proc {
             }
 
             // An empty user page table.
-            // (*p).pagetable = super::vm::proc_pagetable(p);
+            (*p).pagetable = proc_pagetable(p);
             if (*p).pagetable.is_null() {
                 freeproc(p);
                 (*p).lock.release();
@@ -301,9 +301,9 @@ unsafe fn freeproc(p: *mut Proc) {
     }
     (*p).trapframe = ptr::null_mut();
 
-    // if !(*p).pagetable.is_null() {
-    //     super::vm::proc_freepagetable((*p).pagetable, (*p).sz);
-    // }
+    if !(*p).pagetable.is_null() {
+        proc_freepagetable((*p).pagetable as *mut u64, (*p).sz);
+    }
     (*p).pagetable = ptr::null_mut();
 
     (*p).sz = 0;
@@ -616,9 +616,9 @@ pub unsafe fn scheduler() -> ! {
                 // Switch to chosen process. It is the process's job
                 // to release its lock and then reacquire it
                 // before jumping back to us.
-                (*p).state = ProcState::RUNNABLE;
+                (*p).state = ProcState::RUNNING;
                 (*c).proc = p;
-                swtch(&mut (*p).context, &mut (*c).context);
+                swtch(&mut (*c).context, &mut (*p).context);
                 // Process is done running for now.
                 // It should have changed its p->state before coming back.
                 (*c).proc = ptr::null_mut();

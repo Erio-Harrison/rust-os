@@ -5,7 +5,6 @@ use crate::{
 };
 
 /// Long-term locks for processes
-#[derive(Clone, Copy)]
 pub struct Sleeplock {
     pub locked: uint,    // Is the lock held?
     pub lk: SpinLock,    // spinlock protecting this sleep lock

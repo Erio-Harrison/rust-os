@@ -1,9 +1,9 @@
 // src/trap.rs
-use crate::{memlayout::{TRAMPOLINE, UART0_IRQ, VIRTIO0_IRQ}, 
-plic::{plic_claim, plic_complete}, println, 
+use crate::{memlayout::{TRAMPOLINE, UART0_IRQ, VIRTIO0_IRQ},
+plic::{plic_claim, plic_complete}, println,
 proc::{cpuid, exit, myproc, wakeup, yield_proc},
  riscv_local::{intr_get, intr_off, intr_on, make_satp, r_satp, r_scause, r_sepc, r_sstatus, r_stval, r_time, r_tp, w_sepc, w_sstatus, w_stimecmp, w_stvec, PGSIZE, SSTATUS_SPIE, SSTATUS_SPP}, spinlock::SpinLock, syscall::syscall,
-  types::uint64};
+  types::uint64, uart::uartintr};
 
 pub static mut TICKSLOCK: SpinLock = SpinLock::new("time\0".as_bytes().as_ptr());
 pub static mut TICKS: usize = 0;
@@ -328,8 +328,7 @@ unsafe fn devintr() -> i32 {
         let irq = plic_claim();
 
         if irq == UART0_IRQ as i32 {
-            //uartintr();
-            println!("I am testing!")
+            uartintr();
         } else if irq == VIRTIO0_IRQ as i32 {
             DISK.virtio_disk_intr();
         } else if irq != 0 {

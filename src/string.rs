@@ -138,11 +138,14 @@ pub unsafe fn safestrcpy(s: *mut u8, t: *const u8, n: i32) -> *mut u8 {
     os
 }
 
-/// Get string length
+/// Maximum string length to prevent infinite loops
+const MAX_STRLEN: i32 = 4096;
+
+/// Get string length (with bounds check)
 #[no_mangle]
 pub unsafe fn strlen(s: *const u8) -> i32 {
     let mut n = 0;
-    while *s.add(n as usize) != 0 {
+    while n < MAX_STRLEN && *s.add(n as usize) != 0 {
         n += 1;
     }
     n

@@ -57,9 +57,12 @@ pub extern "C" fn rust_main() -> ! {
     }
     println!("xv6 kernel is booting");
 
-    let hart_id = unsafe { r_mhartid() };
+    // Use r_tp() instead of r_mhartid() since we're in S-mode
+    // Hart ID was saved to tp register in start()
+    let hart_id = unsafe { riscv_local::r_tp() };
     if hart_id == 0 {
         kernel_init();
+        hart_init();  // Hart 0 also needs PLIC and trap init
         set_started(true);
     } else {
         while !get_started() {}
@@ -82,7 +85,9 @@ fn kernel_init() {
     unsafe { crate::console::consoleinit() };
     println!("Console initialized.");
     unsafe { crate::trap::trapinit() };
+    unsafe { crate::plic::plicinit() };  // Initialize PLIC interrupt priorities
     crate::proc::proc_init();
+    unsafe { crate::fs::itable_init() };
     println!("Kernel initialized.");
 }
 

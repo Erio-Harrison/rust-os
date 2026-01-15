@@ -89,6 +89,20 @@ pub unsafe fn uartgetc() -> Option<u8> {
     }
 }
 
+/// Handle UART interrupt
+/// Called from trap handler when UART device interrupts
+pub unsafe fn uartintr() {
+    // Read and process incoming characters
+    loop {
+        match uartgetc() {
+            Some(c) => {
+                crate::console::CONS.consoleintr(c as i32);
+            }
+            None => break,
+        }
+    }
+}
+
 // Register access functions
 unsafe fn read_reg(reg: usize) -> u8 {
     read_volatile((UART_BASE_ADDR + reg) as *const u8)

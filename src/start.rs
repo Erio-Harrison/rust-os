@@ -11,7 +11,13 @@ pub unsafe extern "C" fn start() -> ! {
     unsafe {
         uartputc_sync(b'A');
     }
-    
+
+    // Read hart ID in Machine mode and store in tp register
+    // This is needed because mhartid is only accessible in M-mode
+    let hart_id: u64;
+    core::arch::asm!("csrr {}, mhartid", out(reg) hart_id);
+    w_tp(hart_id);
+
     let mut x = r_mstatus();
     x &= !MSTATUS_MPP_MASK;
     x |= MSTATUS_MPP_S;
